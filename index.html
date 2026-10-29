@@ -52,6 +52,9 @@ body { font: 16px/1.45 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun 
 h1 { font-size: 19px; margin: 0; }
 /* 본문: 하단 탭바 높이만큼 아래 여백 */
 main { padding: 12px 16px calc(84px + env(safe-area-inset-bottom)); }
+body.has-install main { padding-bottom: calc(200px + env(safe-area-inset-bottom)); }
+/* 긴 이름이 좁은 화면에서 가로로 넘치지 않게 */
+.totals > div, .amts .v, .grid3 .chip { min-width: 0; overflow-wrap: anywhere; }
 .summary { padding: 10px 14px; }
 /* 하단 탭바 — 알바 앱과 같은 구성: 고정 · 아이콘+글자 · 선택 탭 강조 · 아이폰 홈 막대 여백 */
 .tab-bar { position: fixed; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; z-index: 10; display: flex;
@@ -297,7 +300,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="calc.js"></script>
+<script src="calc.js?v=12"></script>
 <script>
 (function () {
   'use strict';
@@ -306,9 +309,37 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- 저장소 ----------
+  var DEFAULT_PLAYERS = ['장모님', '이준규', '전진표'];
+  // 저장값을 읽되, 일부가 망가져 있어도 살릴 수 있는 것은 살리고 원본은 따로 보관한다 (기본값으로 덮어쓰지 않음)
   function load() {
-    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.players) return s; } catch (e) {}
-    return { players: ['장모님', '이준규', '전진표'], session: null, history: [], pendingPpeok: [] };
+    var raw = null, s = null, lost = false;
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+    if (raw) { try { s = JSON.parse(raw); } catch (e) { lost = true; } }
+    if (!s || typeof s !== 'object' || Array.isArray(s)) { if (raw) lost = true; s = {}; }
+    var isName = function (n) { return typeof n === 'string' && n.trim() !== ''; };
+    var players = Array.isArray(s.players) && s.players.length === 3 && s.players.every(isName) ? s.players : DEFAULT_PLAYERS.slice();
+    if (s.players !== undefined && players !== s.players) lost = true;
+    var okGame = function (g) { return g && typeof g === 'object' && typeof g.id === 'string' && (g.winner == null || Number.isInteger(g.winner)) && Number.isInteger(g.score); };
+    var session = null;
+    if (s.session && typeof s.session.date === 'string' && Array.isArray(s.session.games)) {
+      var kept = s.session.games.filter(okGame).map(function (g) {   // 판 기록에 이름 목록이 없으면 현재 이름으로 채움
+        return Array.isArray(g.players) && g.players.length === 3 ? g : Object.assign({}, g, { players: players });
+      });
+      if (kept.length !== s.session.games.length) lost = true;
+      session = { date: s.session.date, games: kept };
+    } else if (s.session) lost = true;
+    var history = [];
+    if (Array.isArray(s.history)) {
+      history = s.history.filter(function (h) { return h && typeof h.date === 'string' && Array.isArray(h.totals) && h.totals.length === 3; })
+        .map(function (h) { return Object.assign({}, h, { players: Array.isArray(h.players) && h.players.length === 3 ? h.players : players, games: +h.games || 0 }); });
+      if (history.length !== s.history.length) lost = true;
+    } else if (s.history !== undefined) lost = true;
+    if (lost && raw) { try { localStorage.setItem(KEY + '.backup.' + Date.now(), raw); } catch (e) {} }
+    return { players: players, session: session, history: history,
+      pendingPpeok: GoStop.ppeokList(s.pendingPpeok).filter(function (i) { return i >= 0 && i < 3; }),
+      draft: s.draft && typeof s.draft === 'object' ? s.draft : null,
+      draftNew: s.draftNew && typeof s.draftNew === 'object' ? s.draftNew : null,
+      recovered: lost && !!raw };
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -345,12 +376,33 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // 첫뻑: 새 판은 누르는 즉시 반영(state.pendingPpeok, 새로고침해도 유지) → 저장 때 그 판 기록에 포함. 수정 중이면 그 판의 값.
   function curPpeok() { return form.editId ? form.ppeok : (state.pendingPpeok || (state.pendingPpeok = [])); }
   resetForm();
-  // 입력 중이던 판 복원 (앱이 꺼졌다 켜져도 그대로). 수정 중이던 판이 사라졌으면 새 판으로.
-  if (state.draft) {
-    var d0 = state.draft;
-    var editOk = !d0.editId || (state.session && state.session.games.some(function (g) { return g.id === d0.editId; }));
-    if (editOk) Object.keys(form).forEach(function (k) { if (d0[k] !== undefined) form[k] = d0[k]; });
+  // 저장돼 있던 입력 상태를 검사해서 올바른 칸만 form 에 옮긴다
+  function applyForm(d) {
+    if (!d || typeof d !== 'object') return;
+    var inRange = function (v, lo, hi) { return Number.isInteger(v) && v >= lo && v <= hi; };
+    if (d.winner === null || inRange(d.winner, 0, 2)) form.winner = d.winner;
+    if (typeof d.nagari === 'boolean') form.nagari = d.nagari && form.winner == null;
+    if (inRange(d.score, 1, 99)) form.score = d.score;
+    if (inRange(d.go, 0, 9)) form.go = d.go;
+    if (inRange(d.shake, 0, 5)) form.shake = d.shake;
+    if (d.bak && typeof d.bak === 'object' && !Array.isArray(d.bak)) form.bak = JSON.parse(JSON.stringify(d.bak));
+    if (d.dokbak === null || inRange(d.dokbak, 0, 2)) form.dokbak = d.dokbak;
+    form.ppeok = GoStop.ppeokList(d.ppeok).filter(function (i) { return i >= 0 && i < 3; });
+    if (typeof d.editId === 'string') form.editId = d.editId;
   }
+  function editTargetExists(id) { return !!(id && state.session && state.session.games.some(function (g) { return g.id === id; })); }
+  // 수정을 마치거나 취소하면, 수정 전에 입력하던 새 판으로 돌아간다
+  function restoreNewForm() {
+    resetForm();
+    if (state.draftNew) { applyForm(state.draftNew); form.editId = null; }
+    state.draftNew = null;
+  }
+  // 입력 중이던 판 복원 (앱이 꺼졌다 켜져도 그대로). 수정 중이던 판이 사라졌으면 그 전에 입력하던 새 판으로.
+  if (state.draft) {
+    applyForm(state.draft);
+    if (form.editId && !editTargetExists(form.editId)) restoreNewForm();
+  }
+  if (!form.editId) state.draftNew = null;
 
   function gameFromForm() {
     return { players: state.players, winner: form.nagari ? null : form.winner, score: form.score, go: form.go, shake: form.shake,
@@ -563,13 +615,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       state.session.games.push(rec);
       toast(state.session.games.length + '번째 판 저장');
     }
-    save(); resetForm(); render();
+    if (backToToday) restoreNewForm(); else resetForm();
+    render();
     if (backToToday) showTab('today');
   };
-  $('btnCancelEdit').onclick = function () { var wasEdit = !!form.editId; resetForm(); render(); if (wasEdit) showTab('today'); };
+  $('btnCancelEdit').onclick = function () { var wasEdit = !!form.editId; if (wasEdit) restoreNewForm(); else resetForm(); render(); if (wasEdit) showTab('today'); };
 
   function startEdit(id) {
     var g = state.session.games.find(function (x) { return x.id === id; }); if (!g) return;
+    if (!form.editId) state.draftNew = JSON.parse(JSON.stringify(form)); // 입력 중이던 새 판 보관
     form = { winner: g.winner, nagari: g.winner == null, score: g.score || 3, go: g.go || 0, shake: g.shake || 0, bak: JSON.parse(JSON.stringify(g.bak || {})),
       dokbak: g.dokbak, ppeok: GoStop.ppeokList(g.ppeok), editId: id };
     render(); showTab('play'); $('hEntry').scrollIntoView();
@@ -581,11 +635,14 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     if (form.editId) { if (k >= 0) pp.splice(k, 1); else pp.push(i); render(); return; }
     if (k >= 0) {
       confirmBox(P[i] + ' 첫뻑(+2,000)을 취소할까요?').then(function (ok) {
-        if (!ok) return; pp.splice(k, 1); save(); render(); toast(P[i] + ' 첫뻑 취소');
+        if (!ok) return; pp.splice(k, 1);
+        if (state.session && !state.session.games.length && !pp.length) state.session = null;
+        render(); toast(P[i] + ' 첫뻑 취소');
       });
       return;
     }
-    pp.push(i); save(); resetForm(); render();
+    if (!state.session) state.session = { date: today(), games: [] }; // 첫 활동 날짜 = 게임 날짜
+    pp.push(i); resetForm(); render();
     toast('🎉 ' + P[i] + ' 첫뻑 +2,000 반영');
     $('hEntry').scrollIntoView({ behavior: 'smooth' });
   }
@@ -595,24 +652,27 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     confirmBox('#' + (i + 1) + ' ' + describe(games[i]) + '\n이 판을 삭제할까요?').then(function (ok) {
       if (!ok) return;
       games.splice(i, 1);
-      if (form.editId === id) resetForm();
-      if (!games.length) state.session = null;
-      save(); render(); toast('삭제했습니다');
+      if (form.editId === id) restoreNewForm();
+      if (!games.length && !(state.pendingPpeok || []).length) state.session = null;
+      render(); toast('삭제했습니다');
     });
   }
 
   function closeDay() {
     var s = state.session; if (!s || !s.games.length) return;
+    if (form.editId) { showTab('play'); toast('수정 중인 판을 먼저 [수정 저장] 또는 [수정 취소] 하세요'); return; }
     if ((state.pendingPpeok || []).length) { showTab('play'); toast('첫뻑이 반영된 진행 중인 판을 먼저 저장하세요'); return; }
     var totals = sumTotals(sessionResults());
     var line = state.players.map(function (n, i) { return n + ' ' + won(totals[i]); }).join(' / ');
     confirmBox('🏁 오늘 게임을 종료할까요?\n\n' + dayLabel(s.date) + ' · ' + s.games.length + '판\n' + line + '\n\n판별 기록은 정리되고 최종 금액만 [지난 기록]에 남습니다. 되돌릴 수 없습니다.').then(function (ok) {
       if (!ok) return;
-      var existing = state.history.find(function (h) { return h.date === s.date && h.players.join() === state.players.join(); });
+      // 같은 날짜·같은 세 사람이고 승패가 기록된 항목만 합친다 (승패 없는 옛 기록과는 따로 한 줄)
+      var same = JSON.stringify(state.players);
+      var existing = state.history.find(function (h) { return h.date === s.date && JSON.stringify(h.players) === same && h.wl; });
       var wl = GoStop.winLoss(s.games, state.players.length);
       if (existing) {
         totals.forEach(function (t, i) { existing.totals[i] += t; }); existing.games += s.games.length;
-        if (existing.wl) wl.forEach(function (x, i) { existing.wl[i].w += x.w; existing.wl[i].l += x.l; });
+        wl.forEach(function (x, i) { existing.wl[i].w += x.w; existing.wl[i].l += x.l; });
       }
       else state.history.push({ date: s.date, players: state.players.slice(), totals: totals, wl: wl, games: s.games.length });
       state.history.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -660,8 +720,28 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     state.players = names; save(); render(); toast('이름을 저장했습니다');
   };
 
-  render();
-  showTab(location.hash.slice(1));
+  // 화면을 그리다 오류가 나도 인트로에서 멈추지 않게: 기록은 그대로 두고 안내를 띄운다
+  function showFatal(err) {
+    var raw = ''; try { raw = localStorage.getItem(KEY) || ''; } catch (e) {}
+    $('banner').innerHTML = '<div class="banner" role="alert"><b>⚠ 화면을 그리는 중 문제가 생겼어요.</b><br>' +
+      '기록은 지우지 않았어요. [새로고침]을 눌러 보고, 계속되면 [기록 복사]로 기록을 보관한 뒤 알려 주세요.<br>' +
+      '<small>' + esc(String(err && err.message || err)) + '</small>' +
+      '<div class="row"><button id="fatalReload">새로고침</button><button id="fatalCopy">기록 복사</button></div></div>';
+    $('fatalReload').onclick = function () { location.reload(); };
+    $('fatalCopy').onclick = function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(raw) : Promise.reject())
+        .then(function () { toast('기록을 복사했습니다'); })
+        .catch(function () { window.prompt('아래 글을 길게 눌러 복사하세요', raw); });
+    };
+    try { showTab('play'); } catch (e) {}
+  }
+  try {
+    if (typeof GoStop.winLoss !== 'function') throw new Error('앱 파일 버전이 맞지 않아요 (calc.js). 새로고침해 주세요.');
+    render();
+    showTab(location.hash.slice(1));
+    if (state.recovered) { delete state.recovered; toast('⚠ 기록 일부가 손상돼 복구했어요 (원본은 따로 보관)'); }
+  } catch (err) { showFatal(err); }
+  window.addEventListener('error', function (e) { toast('⚠ 오류: ' + (e.message || '알 수 없음')); });
 
   // 앱 설치 안내 — 홈 화면 앱으로 실행 중이면 표시 안 함. 브라우저 종류에 맞는 방법을 안내
   var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -679,7 +759,9 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     $('btnInstall').hidden = mode !== 'prompt';
     $('btnOpenExt').hidden = mode !== 'kakao';
     $('installBar').hidden = false;
+    document.body.classList.add('has-install');
   }
+  function hideInstall() { $('installBar').hidden = true; document.body.classList.remove('has-install'); }
   if (!standalone) {
     if (inKakao) {
       $('btnOpenExt').href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href.split('#')[0]);
@@ -701,11 +783,11 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   $('btnInstall').onclick = function () {
     if (!installEvt) return;
     installEvt.prompt();
-    installEvt.userChoice.then(function () { installEvt = null; $('installBar').hidden = true; });
+    installEvt.userChoice.then(function () { installEvt = null; hideInstall(); });
   };
-  window.addEventListener('appinstalled', function () { $('installBar').hidden = true; toast('설치 완료! 홈 화면의 고스톱 아이콘으로 실행하세요'); });
+  window.addEventListener('appinstalled', function () { hideInstall(); toast('설치 완료! 홈 화면의 고스톱 아이콘으로 실행하세요'); });
   $('btnInstallClose').onclick = function () {
-    $('installBar').hidden = true;
+    hideInstall();
     try { localStorage.setItem('gostop.installDismissed', '1'); } catch (e) {}
   };
 

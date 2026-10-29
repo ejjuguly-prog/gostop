@@ -86,6 +86,17 @@ cases.push(['승패: 승 2·나가리 1·독박 1', winLoss([
   G({ winner: 2, score: 5, dokbak: 1 }),   // 독박도 패
 ], 3), [{ w: 1, l: 1 }, { w: 0, l: 2 }, { w: 1, l: 1 }]]);
 
+// 검수 A: 화면으로는 못 만드는 값이 저장돼 있어도 일관되게 처리
+cases.push(['고 2.5 → 2고로', g({ winner: 1, score: 4, go: 2.5 }), [-2000, 4000, -2000]]);
+cases.push(['고 "3"(글자) → 3고', finalScore(4, '3', 0), 14]);
+cases.push(['승자 범위 밖(3) → 나가리', g({ winner: 3, score: 5 }), [0, 0, 0]]);
+cases.push(['승자 -1 → 나가리', g({ winner: -1, score: 5 }), [0, 0, 0]]);
+cases.push(['승자 "1"(글자) → 금액', g({ winner: '1', score: 3 }), [-1000, 2000, -1000]]);
+cases.push(['승자 "0"(글자) → 승패도 같은 해석', winLoss([{ players: P, winner: '0', score: 3 }], 3), [{ w: 1, l: 0 }, { w: 0, l: 1 }, { w: 0, l: 1 }]]);
+cases.push(['독박 "2"(글자) → 독박 적용', g({ winner: 1, score: 4, dokbak: '2' }), [0, 2000, -2000]]);
+cases.push(['점수 "5"(글자)', g({ winner: 0, score: '5' }), [4000, -2000, -2000]]);
+cases.push(['범위 밖 승자는 isNagari 와 일치', require('./calc.js').isNagari({ players: P, winner: 5, score: 5 }), true]);
+
 // 승자는 항상 1명: 승패 금액(winAmounts)에서 플러스는 승자뿐 — 모든 조합 전수 검사
 const full = (o) => calcGame(Object.assign({ players: P, winner: null, score: 0, bak: {}, dokbak: null, ppeok: null }, o));
 let combos = 0, bad = 0;

@@ -6,8 +6,14 @@
   var PPEOK_UNIT = 1000;  // 첫뻑: 나머지 사람이 1인당 내는 돈
   var MIN_SCORE = 3;      // 이 점수 미만 = 나가리(금액 없음)
 
+  // 입력 정규화 — 저장값이 문자열·소수·범위 밖이어도 모든 함수가 같은 해석을 하도록
+  function toInt(v) { var x = typeof v === 'string' && v.trim() !== '' ? Number(v) : v; return Number.isInteger(x) ? x : NaN; }
+  function toIdx(v, n) { var x = toInt(v); return x >= 0 && x < n ? x : null; }          // 사람 index (아니면 null)
+  function toCount(v) { var x = Number(v); return Number.isFinite(x) && x > 0 ? Math.floor(x) : 0; } // 고·흔들기 횟수
+
   // 3·4점 1천, 5·6점 2천, 7·8점 3천 … (짝수는 바로 아래 홀수로 인정)
   function baseAmount(score) {
+    score = toInt(score);
     if (!Number.isInteger(score) || score < MIN_SCORE) return 0;
     return Math.floor((score - 1) / 2) * UNIT;
   }
@@ -19,7 +25,7 @@
    * 기본 점수가 3점 미만이면 고를 할 수 없으므로 그대로 둔다(나가리).
    */
   function finalScore(score, go, shake) {
-    go = go > 0 ? go : 0; shake = shake > 0 ? shake : 0;
+    score = toInt(score); go = toCount(go); shake = toCount(shake);
     if (!Number.isInteger(score) || score < MIN_SCORE) return score;
     var goMult = go >= 3 ? Math.pow(2, go - 2) : 1;
     return (score + go) * goMult * Math.pow(2, shake);
@@ -51,11 +57,11 @@
     var amounts = new Array(n).fill(0);
     var base = 0;
     var mult = game.mult || 1;
-    var nagari = game.winner == null || baseAmount(game.score) === 0;
+    var w = toIdx(game.winner, n);
+    var nagari = w == null || baseAmount(game.score) === 0;
     var final = finalScore(game.score, game.go, game.shake);
 
     if (!nagari) {
-      var w = game.winner;
       base = baseAmount(final) * mult;
       var losers = [];
       for (var i = 0; i < n; i++) if (i !== w) losers.push(i);
@@ -66,7 +72,7 @@
         share[l] = base * Math.pow(2, bakCount((game.bak || {})[l]));
       });
 
-      var d = game.dokbak;
+      var d = toIdx(game.dokbak, n);
       if (d != null && d !== w && losers.indexOf(d) >= 0) {
         // 독박(A안): 독박자가 모든 패자 몫(각자의 박 포함)을 혼자 낸다
         var all = losers.reduce(function (s, l) { return s + share[l]; }, 0);
@@ -105,10 +111,14 @@
   // 첫뻑 값 정규화: null·단일 index·배열 → 중복 없는 index 배열
   function ppeokList(v) {
     var arr = v == null ? [] : Array.isArray(v) ? v : [v];
+    arr = arr.map(toInt);
     return arr.filter(function (x, i) { return Number.isInteger(x) && arr.indexOf(x) === i; });
   }
 
-  function isNagari(game) { return game.winner == null || baseAmount(game.score) === 0; }
+  function isNagari(game) {
+    var n = game.players && game.players.length ? game.players.length : 3;
+    return toIdx(game.winner, n) == null || baseAmount(game.score) === 0;
+  }
 
   // 판 순서대로 계산: 직전까지 연속된 나가리 수만큼 2배씩 (승자가 나오면 1배로 초기화)
   function calcSession(games) {
@@ -125,8 +135,9 @@
     var wl = [];
     for (var i = 0; i < n; i++) wl.push({ w: 0, l: 0 });
     games.forEach(function (g) {
-      if (isNagari(g)) return;
-      for (var j = 0; j < n; j++) { if (j === g.winner) wl[j].w++; else wl[j].l++; }
+      var w = toIdx(g.winner, n);
+      if (w == null || baseAmount(g.score) === 0) return;
+      for (var j = 0; j < n; j++) { if (j === w) wl[j].w++; else wl[j].l++; }
     });
     return wl;
   }

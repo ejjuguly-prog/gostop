@@ -48,4 +48,4 @@ node calc.test.js
 python -m http.server 5173 --bind 127.0.0.1
 ```
 
-두 번째 명령 후 http://localhost:5173 에서 확인. 규칙을 바꾸면 `calc.js` 와 `calc.test.js` 를 함께 고치고, `sw.js` 의 `CACHE` 이름을 올려 폰에 새 버전이 반영되게 한다.
+두 번째 명령 후 http://localhost:5173 에서 확인. 규칙을 바꾸면 `calc.js` 와 `calc.test.js` 를 함께 고친다. 배포할 때마다 `sw.js` 의 `CACHE`(gostop-vN)·`FILES` 의 `calc.js?v=N` 과 `index.html` 의 `calc.js?v=N` 을 같은 숫자로 올린다(화면과 계산 파일이 다른 버전으로 섞이지 않게).
