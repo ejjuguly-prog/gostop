@@ -133,6 +133,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .games li.editing { background: var(--warn-bg); border-radius: 10px; padding-inline: 8px; }
 .banner { background: var(--warn-bg); color: var(--warn-text); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .banner button { background: var(--warn-text); color: var(--warn-bg); padding: 0 14px; margin-top: 8px; font-weight: 700; }
+.autosave { font-size: 12.5px; margin: 10px 0 0; }
 .close-day { background: var(--chip); width: 100%; font-weight: 700; margin-top: 8px; }
 .hist li { display: block; }
 dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); padding: 18px; }
@@ -215,17 +216,19 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="preview" id="preview" aria-live="polite"></div>
     <button class="primary" id="btnSave">저장</button>
     <div class="row" style="margin-top:8px"><button class="ghost" id="btnCancelEdit" hidden>수정 취소</button></div>
+    <p class="hint autosave">💾 입력 중인 내용도 자동 저장돼요. 앱이 꺼져도 [오늘 게임 종료] 전까지 그대로 이어집니다.</p>
+    <button class="close-day" id="btnClose2" hidden>🏁 오늘 게임 종료</button>
   </section>
 </section>
 
-<!-- 탭 2: 오늘 기록 (판별 기록 · 수정 · 마감) -->
+<!-- 탭 2: 오늘 기록 (판별 기록 · 수정 · 게임 종료) -->
 <section class="view" id="view-today" aria-labelledby="tab-today" hidden>
   <div class="card summary"><div class="totals" id="totals2"></div></div>
   <section class="card" aria-labelledby="hGames">
     <h2 id="hGames">판별 기록 <span id="gameCount"></span></h2>
     <ul class="games" id="games"></ul>
     <p class="hint" id="noGames">아직 기록이 없습니다. <b>게임</b> 탭에서 판을 입력하세요.</p>
-    <button class="close-day" id="btnClose">오늘 마감 (최종 금액만 남기기)</button>
+    <button class="close-day" id="btnClose">🏁 오늘 게임 종료 (최종 금액만 남기기)</button>
   </section>
 </section>
 
@@ -234,7 +237,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   <section class="card" aria-labelledby="hHist">
     <h2 id="hHist">날짜별 최종 기록</h2>
     <ul class="games hist" id="hist"></ul>
-    <p class="hint" id="noHist">마감한 날짜가 없습니다. <b>오늘 기록</b> 탭에서 [오늘 마감]을 누르면 여기에 남습니다.</p>
+    <p class="hint" id="noHist">종료한 게임이 없습니다. [🏁 오늘 게임 종료]를 누르면 그날 최종 금액이 여기에 남습니다.</p>
   </section>
 </section>
 
@@ -257,7 +260,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <dt>독박</dt><dd>독박한 사람이 패자 몫 전부(박 포함)를 혼자 냄</dd>
       <dt>첫뻑</dt><dd>누르는 즉시 +2,000 (나머지 두 명 각 −1,000) · 한 판에 1인 1회</dd>
       <dt>나가리</dt><dd>다음 판 판돈 ×2 · 연속이면 ×4, ×8 …</dd>
-      <dt>마감</dt><dd>판별 기록을 정리하고 날짜별 최종 금액만 남김</dd>
+      <dt>게임 종료</dt><dd>누르기 전까지는 앱을 꺼도·자정이 지나도 이어서 기록. 누르면 판별 기록을 정리하고 시작한 날짜로 최종 금액만 남김</dd>
     </dl>
   </section>
 </section>
@@ -309,6 +312,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     catch (e) { toast('⚠ 저장 실패 — 브라우저 저장공간을 확인하세요'); }
   }
   var state = load();
+  // 폰이 저장 공간을 정리할 때 이 앱 기록은 지우지 않도록 요청 (홈 화면 앱은 대개 허용됨)
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) {}
 
   // ---------- 유틸 ----------
   function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -337,6 +342,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // 첫뻑: 새 판은 누르는 즉시 반영(state.pendingPpeok, 새로고침해도 유지) → 저장 때 그 판 기록에 포함. 수정 중이면 그 판의 값.
   function curPpeok() { return form.editId ? form.ppeok : (state.pendingPpeok || (state.pendingPpeok = [])); }
   resetForm();
+  // 입력 중이던 판 복원 (앱이 꺼졌다 켜져도 그대로). 수정 중이던 판이 사라졌으면 새 판으로.
+  if (state.draft) {
+    var d0 = state.draft;
+    var editOk = !d0.editId || (state.session && state.session.games.some(function (g) { return g.id === d0.editId; }));
+    if (editOk) Object.keys(form).forEach(function (k) { if (d0[k] !== undefined) form[k] = d0[k]; });
+  }
 
   function gameFromForm() {
     return { players: state.players, winner: form.nagari ? null : form.winner, score: form.score, go: form.go, shake: form.shake,
@@ -362,13 +373,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // ---------- 렌더 ----------
   function render() {
     var P = state.players, s = state.session;
-    var isStale = s && s.date !== today();
+    // 게임 종료 전까지는 날짜가 바뀌어도 같은 게임으로 계속 이어간다
+    var carried = s && s.date !== today();
 
-    // 지난 날짜 미마감 알림
-    $('banner').innerHTML = isStale
-      ? '<div class="banner" role="alert"><b>' + esc(dayLabel(s.date)) + '</b> 기록이 아직 마감되지 않았습니다.<br>' +
-        '<button id="btnCloseStale">그 날짜로 마감하기</button></div>' : '';
-    if (isStale) $('btnCloseStale').onclick = closeDay;
+    // 전날 시작한 게임을 이어서 하는 중이면 안내만 (입력은 막지 않음)
+    $('banner').innerHTML = carried
+      ? '<div class="banner" role="status">📅 <b>' + esc(dayLabel(s.date)) + '</b>에 시작한 게임을 이어서 기록 중이에요. 다 끝나면 [🏁 오늘 게임 종료]를 눌러 주세요.</div>' : '';
 
     $('todayLabel').textContent = dayLabel(s ? s.date : today());
 
@@ -418,7 +428,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     var pp = curPpeok();
     $('ppeokBtns').innerHTML = P.map(function (n, i) {
       var done = pp.indexOf(i) >= 0;
-      return '<button class="chip" data-p="' + i + '" aria-pressed="' + done + '"' + (isStale && !form.editId ? ' disabled' : '') +
+      return '<button class="chip" data-p="' + i + '" aria-pressed="' + done + '"' +
         ' aria-label="' + esc(n) + (done ? ' 첫뻑 반영됨, 누르면 취소' : ' 첫뻑') + '">' + (done ? '✓ ' : '') + esc(n) + '</button>';
     }).join('') + (pp.length ? '<div class="hint" style="grid-column:1/-1">이 판 첫뻑: ' + pp.map(function (i) { return esc(P[i]) + ' +' + (GoStop.PPEOK_UNIT * 2).toLocaleString('ko-KR'); }).join(', ') +
       (form.editId ? '' : ' — 누적에 반영됨') + '</div>' : '');
@@ -432,10 +442,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       var crown = r && !r.nagari && i === form.winner ? '🏆 ' : '';
       return '<div><div class="hint">' + crown + esc(n) + '</div><div class="amt ' + cls(a) + '">' + (r ? won(a) : '–') + '</div></div>';
     }).join('') + (r && pp.length ? '<div class="hint" style="grid-column:1/-1">+ 첫뻑 ' + pp.map(function (i) { return esc(P[i]); }).join(', ') + ' (저장 시 이 판 기록에 함께 남음)</div>' : '');
-    // 지난 날짜가 미마감이면 새 판이 그 날짜에 섞이지 않게 막는다 (수정은 허용)
-    var blockNew = isStale && !form.editId;
-    $('btnSave').disabled = !ready || blockNew;
-    $('btnSave').textContent = blockNew ? '지난 날짜를 먼저 마감하세요' : form.editId ? '수정 저장' : '저장';
+    $('btnSave').disabled = !ready;
+    $('btnSave').textContent = form.editId ? '수정 저장' : '저장';
     $('btnCancelEdit').hidden = !form.editId;
     $('entryTitle').textContent = form.editId ? '판 수정 중' : '새 판 입력';
 
@@ -447,6 +455,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     $('tab-today').setAttribute('aria-label', '오늘 기록' + (games.length ? ', ' + games.length + '판' : ''));
     $('noGames').hidden = games.length > 0;
     $('btnClose').hidden = games.length === 0;
+    $('btnClose2').hidden = games.length === 0 || !!form.editId;
+    // 입력 중인 판을 매번 저장 → 앱이 꺼져도 다시 켜면 그대로
+    state.draft = JSON.parse(JSON.stringify(form));
+    save();
     $('games').innerHTML = games.map(function (g, idx) { return { g: g, no: idx + 1 }; }).reverse().map(function (x) {
       var g = x.g, gr = results[x.no - 1];
       var line = function (label, arr) {
@@ -585,19 +597,19 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
   function closeDay() {
     var s = state.session; if (!s || !s.games.length) return;
-    if ((state.pendingPpeok || []).length) { toast('첫뻑이 반영된 진행 중인 판을 먼저 저장하세요'); return; }
+    if ((state.pendingPpeok || []).length) { showTab('play'); toast('첫뻑이 반영된 진행 중인 판을 먼저 저장하세요'); return; }
     var totals = sumTotals(sessionResults());
     var line = state.players.map(function (n, i) { return n + ' ' + won(totals[i]); }).join(' / ');
-    confirmBox(dayLabel(s.date) + ' 판별 기록 ' + s.games.length + '판을 정리하고\n최종 금액만 남깁니다.\n\n' + line + '\n\n판별 기록은 되돌릴 수 없습니다.').then(function (ok) {
+    confirmBox('🏁 오늘 게임을 종료할까요?\n\n' + dayLabel(s.date) + ' · ' + s.games.length + '판\n' + line + '\n\n판별 기록은 정리되고 최종 금액만 [지난 기록]에 남습니다. 되돌릴 수 없습니다.').then(function (ok) {
       if (!ok) return;
       var existing = state.history.find(function (h) { return h.date === s.date && h.players.join() === state.players.join(); });
       if (existing) { totals.forEach(function (t, i) { existing.totals[i] += t; }); existing.games += s.games.length; }
       else state.history.push({ date: s.date, players: state.players.slice(), totals: totals, games: s.games.length });
       state.history.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-      state.session = null; resetForm(); save(); render(); toast('마감했습니다');
+      state.session = null; resetForm(); render(); showTab('history'); toast('게임을 종료했습니다 — 지난 기록에 남았어요');
     });
   }
-  $('btnClose').onclick = closeDay;
+  $('btnClose').onclick = $('btnClose2').onclick = closeDay;
 
   function dayText(h) {
     return '🎴 고스톱 ' + dayLabel(h.date) + ' (' + h.games + '판)\n' +
