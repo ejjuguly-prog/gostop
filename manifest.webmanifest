@@ -7,6 +7,8 @@
   "start_url": "./#play",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone"],
+  "prefer_related_applications": false,
   "orientation": "portrait",
   "background_color": "#2a6b16",
   "theme_color": "#2a6b16",
