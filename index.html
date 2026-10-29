@@ -45,6 +45,8 @@ button { touch-action: manipulation; -webkit-user-select: none; user-select: non
 @media (prefers-reduced-motion: reduce) { #intro img, #intro .t, #intro .s { animation: none; } #intro { transition: none; } }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body { font: 16px/1.45 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; max-width: 560px; margin: 0 auto; }
+/* 한글은 단어 단위로 줄바꿈 ("남기|기"처럼 단어 중간에서 끊기지 않게). 넘치는 긴 글자만 아무 데서나 끊음 */
+body { word-break: keep-all; overflow-wrap: break-word; }
 /* 상단: 현재 탭 이름 + 날짜 (스크롤해도 고정) */
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px;
   padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
@@ -135,7 +137,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 미리보기 + 저장 버튼: 하단 탭바(설치 안내가 있으면 그 위)에 붙어 다님 → 스크롤 없이 저장 */
 .savebar { position: sticky; bottom: calc(62px + env(safe-area-inset-bottom) + var(--install-h, 0px)); z-index: 4; margin: 0 -14px; padding: 8px 14px;
   background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -2px 12px rgba(0,0,0,.06); }
-.savebar .preview { margin: 0 0 8px; padding: 6px; }
+/* 박·독박 요약 줄이 들어가도 바 높이가 늘지 않게 줄 간격·여백을 줄임 */
+.savebar { padding-top: 6px; padding-bottom: 6px; }
+.savebar .preview { margin: 0 0 6px; padding: 4px 6px; gap: 2px 8px; line-height: 1.25; }
+.savebar .preview .sum { grid-column: 1 / -1; font-size: 14px; }
+.savebar .primary { min-height: 48px; }
+/* 게임 탭 맨 아래 [오늘 게임 종료]: 저장 버튼과 멀리 떼어 놓음 */
+.close-wrap { margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line); }
+.close-wrap .hint { margin: 0; }
 .games { list-style: none; margin: 0; padding: 0; }
 .games li { display: flex; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .games li:first-child { border-top: 0; }
@@ -160,14 +169,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .autosave { font-size: 14px; margin: 10px 0 0; }
 .close-day, .wide { background: var(--chip); width: 100%; font-weight: 700; margin-top: 8px; }
 textarea.input { resize: vertical; min-height: 88px; margin: 0; }
+/* 복원 버튼: 지금 기록을 바꾸는 버튼이라 복사 버튼과 다른 모양(빨간 테두리) */
+.wide.danger { background: transparent; color: var(--minus); border: 2px solid var(--minus); }
 .hist li { display: block; }
 dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); padding: 18px; }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 .dlg-actions button { padding: 0 16px; }
 .dlg-actions .primary { width: auto; min-height: 44px; font-size: 16px; padding: 0 16px; }
-/* 알림: 화면 위쪽(상단바 바로 아래) — 저장 버튼·점수 칸을 가리지 않게 */
-.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 64px); bottom: auto; z-index: 20; transform: translateX(-50%);
+/* 알림: 아래쪽 — 게임 탭은 저장 바 바로 위, 다른 탭은 하단 탭바 바로 위 (누적 금액·저장 버튼을 가리지 않게).
+   정확한 높이는 toast() 가 띄울 때 계산해 bottom 에 넣는다 */
+.toast { position: fixed; left: 50%; top: auto; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 20; transform: translateX(-50%);
   width: max-content; max-width: calc(100vw - 32px); text-align: center; background: var(--chip-on); color: var(--chip-on-text);
   padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
@@ -249,7 +261,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <div class="row" id="cancelRow" style="margin-top:8px" hidden><button class="ghost" id="btnCancelEdit">수정 취소</button></div>
     </div>
     <p class="hint autosave">💾 입력 중인 내용도 자동 저장돼요. 앱이 꺼져도 [오늘 게임 종료] 전까지 그대로 이어집니다.</p>
-    <button class="close-day" id="btnClose2" hidden>🏁 오늘 게임 종료</button>
+    <div class="close-wrap" id="closeWrap2" hidden>
+      <p class="hint">오늘 판을 다 쳤을 때만 누르세요. 판별 기록을 정리하고 최종 금액만 남겨요.</p>
+      <button class="close-day" id="btnClose2">🏁 오늘 게임 종료</button>
+    </div>
   </section>
 </section>
 
@@ -285,13 +300,18 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   <section class="card" aria-labelledby="hBackup">
     <h2 id="hBackup">기록 보관</h2>
     <p class="hint" style="margin-top:0">기록은 이 폰에만 있어요. 폰을 바꾸거나 앱 데이터를 지우면 사라지니, 가끔 전체 기록을 복사해 카톡 [나에게 보내기] 등에 보관하세요.</p>
-    <button class="wide" id="btnCopyAll">📋 전체 기록 복사</button>
+    <p class="hint">전체 기록 복사는 <b>폰을 바꾸거나 앱을 지울 때 쓰는 되살리기용 글</b>이에요(읽는 용도 아님). 카톡에 보낼 날짜별 결과는 [지난 기록]의 [📋 복사]를 쓰세요.</p>
+    <button class="wide" id="btnCopyAll">📋 전체 기록 복사 (되살리기용)</button>
     <label class="label" for="restoreText" style="margin-top:16px">보관해 둔 기록 되살리기</label>
-    <textarea class="input" id="restoreText" rows="3" placeholder="복사해 둔 기록을 붙여넣기"></textarea>
-    <button class="wide" id="btnRestore">붙여넣은 기록으로 복원</button>
+    <textarea class="input" id="restoreText" rows="3" placeholder="복사해 둔 되살리기용 글을 붙여넣기"></textarea>
+    <button class="wide danger" id="btnRestore">⚠ 붙여넣은 기록으로 바꾸기</button>
     <div id="backupRow" hidden>
       <p class="hint" id="backupInfo" style="margin:16px 0 0"></p>
-      <button class="wide" id="btnCopyBackup">가장 최근 백업 복사</button>
+      <button class="wide" id="btnCopyBackup">손상 백업 중 가장 최근 것 복사</button>
+    </div>
+    <div id="restoreRow" hidden>
+      <p class="hint" id="restoreInfo" style="margin:16px 0 0"></p>
+      <button class="wide" id="btnCopyRestore">복원 전 기록 중 가장 최근 것 복사</button>
     </div>
   </section>
   <section class="card" aria-labelledby="hRules">
@@ -343,8 +363,9 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 (function () {
   'use strict';
   var KEY = 'gostop.v1';
-  var BACKUP_PREFIX = KEY + '.backup.';
-  var BACKUP_MAX = 5;   // 손상 백업은 최근 5개만 보관
+  var BACKUP_PREFIX = KEY + '.backup.';    // 저장값이 손상됐을 때 보관한 원본
+  var RESTORE_PREFIX = KEY + '.restore.';  // [붙여넣은 기록으로 바꾸기] 직전의 기록
+  var BACKUP_MAX = 5;   // 두 종류 각각 최근 5개만 보관 (서로 밀어내지 않게 따로 셈)
   var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
   var $ = function (id) { return document.getElementById(id); };
 
@@ -357,15 +378,25 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // ---------- 저장소 ----------
   var DEFAULT_PLAYERS = ['장모님', '이준규', '전진표'];
   var fatal = false;     // 시작 오류 상태 — 이때는 저장하지 않는다(원본 기록 보호)
-  var lastRaw = null;    // 마지막으로 읽거나 쓴 저장값 (같으면 다시 쓰지 않음 · 다른 창 변경 감지)
+  var lastRaw = null;    // 마지막으로 저장소에서 읽거나 쓴 값 (다른 창 변경 감지)
+  var lastMine = null;   // 이 창 state 를 마지막으로 맞춰 둔 값 (같으면 다시 쓰지 않음 — 다른 창과 주고받기 방지)
   // 글자 숫자도 calc.js 와 같은 규칙으로 숫자로 (정수만)
   function toInt(v) { var x = typeof v === 'string' && v.trim() !== '' ? Number(v) : v; return Number.isInteger(x) ? x : NaN; }
   function toIdx3(v) { var x = toInt(v); return x >= 0 && x <= 2 ? x : null; }
   function toCount(v) { var x = Number(v); return Number.isFinite(x) && x > 0 ? Math.floor(x) : 0; }
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+  // 판 id: 영문·숫자·_·- 1~40자만 (화면 속성값에 들어가므로). 아니면 새 id 를 준다
+  var ID_RE = /^[\w-]{1,40}$/;
+  var idSeq = 0;
+  function newId() { return 'r' + Date.now() + '-' + (++idSeq); }
   // 판 하나 정규화: 살릴 수 없으면 null (승자·점수가 틀린 판)
-  function normGame(g, players) {
-    if (!isObj(g) || typeof g.id !== 'string') return null;
+  // seen: 이미 쓴 id 모음 — id 가 이상하거나 겹치면 새 id 로 바꾸고 fixed.n 을 올린다
+  function normGame(g, players, seen, fixed) {
+    if (!isObj(g)) return null;
+    var id = g.id;
+    if (typeof id === 'number' && Number.isInteger(id)) id = String(id);   // 숫자 id 는 글자로
+    if (typeof id !== 'string' || !ID_RE.test(id) || seen[id]) { do { id = newId(); } while (seen[id]); fixed.n++; }
+    seen[id] = true;
     var w = null;
     if (g.winner != null) { w = toIdx3(g.winner); if (w == null) return null; }
     var score = toInt(g.score); if (!Number.isInteger(score)) return null;
@@ -375,6 +406,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     });
     var isName = function (n) { return typeof n === 'string' && n.trim() !== ''; };
     return Object.assign({}, g, {
+      id: id,
       players: Array.isArray(g.players) && g.players.length === 3 && g.players.every(isName) ? g.players : players,
       winner: w, score: score, go: toCount(g.go), shake: toCount(g.shake), bak: bak,
       dokbak: g.dokbak == null ? null : toIdx3(g.dokbak),
@@ -386,16 +418,21 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       return isObj(x) && Number.isInteger(x.w) && x.w >= 0 && Number.isInteger(x.l) && x.l >= 0;
     });
   }
-  // 백업 키를 시각순으로 (오래된 것 먼저)
-  function backupKeys() {
+  // 백업 키를 시각순으로 (오래된 것 먼저). prefix 없으면 손상 백업
+  function backupKeys(prefix) {
+    prefix = prefix || BACKUP_PREFIX;
     var ks = [];
-    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(BACKUP_PREFIX) === 0) ks.push(k); } } catch (e) {}
-    return ks.sort(function (a, b) { return (+a.slice(BACKUP_PREFIX.length) || 0) - (+b.slice(BACKUP_PREFIX.length) || 0); });
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) ks.push(k); } } catch (e) {}
+    return ks.sort(function (a, b) { return (+a.slice(prefix.length) || 0) - (+b.slice(prefix.length) || 0); });
   }
-  function writeBackup(raw) {
+  // 백업 한 개 쓰기. 같은 밀리초에 두 번 써도 앞 백업을 덮지 않게, 이미 있는 키면 숫자를 1씩 올린다
+  function writeBackup(raw, prefix) {
+    prefix = prefix || BACKUP_PREFIX;
     try {
-      localStorage.setItem(BACKUP_PREFIX + Date.now(), raw);
-      var ks = backupKeys();
+      var t = Date.now();
+      while (localStorage.getItem(prefix + t) !== null) t++;
+      localStorage.setItem(prefix + t, raw);
+      var ks = backupKeys(prefix);
       ks.slice(0, Math.max(0, ks.length - BACKUP_MAX)).forEach(function (k) { localStorage.removeItem(k); });
     } catch (e) {}
   }
@@ -405,7 +442,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     var check = typeof rawOverride === 'string';
     var raw = null, s = null, lost = false;
     if (check) raw = rawOverride;
-    else { try { raw = localStorage.getItem(KEY); } catch (e) {} lastRaw = raw; }
+    else { try { raw = localStorage.getItem(KEY); } catch (e) {} lastRaw = lastMine = raw; }
     if (raw) { try { s = JSON.parse(raw); } catch (e) { lost = true; } }
     if (!isObj(s)) { if (raw) lost = true; s = {}; }
     var isName = function (n) { return typeof n === 'string' && n.trim() !== ''; };
@@ -414,8 +451,9 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     if (s.players !== undefined && !valid) lost = true;
     var session = null;
     if (isObj(s.session) && typeof s.session.date === 'string' && Array.isArray(s.session.games)) {
-      var kept = s.session.games.map(function (g) { return normGame(g, players); }).filter(Boolean);
-      if (kept.length !== s.session.games.length) lost = true;
+      var seen = {}, fixed = { n: 0 };
+      var kept = s.session.games.map(function (g) { return normGame(g, players, seen, fixed); }).filter(Boolean);
+      if (kept.length !== s.session.games.length || fixed.n) lost = true;
       session = { date: s.session.date, games: kept };
     } else if (s.session) lost = true;
     var history = [];
@@ -440,8 +478,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   function save() {
     if (fatal) return;
     var raw = JSON.stringify(state);
-    if (raw === lastRaw) return;   // 바뀐 게 없으면 쓰지 않음 (다른 창과 주고받기 방지)
-    try { localStorage.setItem(KEY, raw); lastRaw = raw; }
+    if (raw === lastMine) return;   // 바뀐 게 없으면 쓰지 않음 (다른 창과 주고받기 방지)
+    try { localStorage.setItem(KEY, raw); lastRaw = lastMine = raw; }
     catch (e) { toast('⚠ 저장 실패 — 브라우저 저장공간을 확인하세요'); }
   }
   var state, startErr = null, recovered = false;
@@ -465,7 +503,19 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   function num(n) { return n.toLocaleString('ko-KR'); }
   function cls(n) { return n > 0 ? 'plus' : n < 0 ? 'minus' : ''; }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('show'); }, 3000); }
+  function toast(msg) { var t = $('toast'); t.textContent = msg; placeToast(); t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('show'); }, 3000); }
+  // 알림 자리: 게임 탭은 저장 바 바로 위, 그 밖은 하단 탭바(설치 안내가 있으면 그 위) 바로 위
+  function placeToast() {
+    var t = $('toast'), vh = document.documentElement.clientHeight || innerHeight;
+    var y = document.querySelector('.tab-bar').getBoundingClientRect().top;
+    var ib = $('installBar');
+    if (!ib.hidden) y = Math.min(y, ib.getBoundingClientRect().top);
+    var sb = $('saveBar');
+    if (!$('view-play').hidden && sb.offsetParent) { var r = sb.getBoundingClientRect(); if (r.bottom > 0 && r.top < y) y = r.top; }
+    t.style.bottom = Math.max(8, vh - y + 8) + 'px';
+  }
+  // 알림이 떠 있는 동안 스크롤하면 저장 바 위치가 바뀔 수 있어 다시 맞춘다
+  window.addEventListener('scroll', function () { if ($('toast').classList.contains('show')) placeToast(); }, { passive: true });
   // 값이 같으면 건드리지 않음 (화면 읽기 프로그램이 같은 내용을 여러 번 읽지 않게)
   function setText(el, v) { v = String(v); if (el.textContent !== v) el.textContent = v; }
   function setHTML(el, h) { if (setHTML.last.get(el) !== h) { el.innerHTML = h; setHTML.last.set(el, h); } }
@@ -589,6 +639,20 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     return '낼 돈 ' + num(base) + ' × ' + Math.pow(2, k.length) + '(' + k.join('+') + ') = ' + num(share(i)) + '원';
   }
 
+  // 저장 바에 보이는 박·독박 한 줄 요약 — 저장 바가 박 버튼을 가려도 빠뜨린 게 없는지 바로 보이게
+  // 예: "박·독박: 없음" / "박·독박: 장모님 피박 · 이준규 독박"
+  function bakSummary() {
+    var P = state.players, w = form.winner, parts = [];
+    P.forEach(function (n, i) {
+      if (i === w) return;
+      var b = form.bak[i] || {}, k = [];
+      if (b.pi) k.push('피박'); if (b.gwang) k.push('광박'); if (b.meong) k.push('멍박');
+      if (k.length) parts.push(n + ' ' + k.join('+'));
+    });
+    if (form.dokbak != null && form.dokbak !== w) parts.push(P[form.dokbak] + ' 독박');
+    return '박·독박: ' + (parts.length ? parts.join(' · ') : '없음');
+  }
+
   // ---------- 렌더 ----------
   function render() {
     var P = state.players, s = state.session;
@@ -658,12 +722,16 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     // 미리보기
     var ready = form.nagari || form.winner != null;
     var r = ready ? GoStop.calcGame(Object.assign(gameFromForm(), { mult: mult })) : null;
+    // 아래 한 줄: 박·독박 요약(나가리면 생략) + 첫뻑(저장하면 이 판 기록에 함께 남음) — 저장 바 높이가 늘지 않게 한 줄로
+    var sumLine = !r ? '' : [r.nagari ? '' : bakSummary(),
+      pp.length ? '첫뻑 ' + pp.map(function (i) { return P[i]; }).join(', ') + (r.nagari ? ' (이 판 기록에 함께 저장)' : '') : ''
+    ].filter(Boolean).join(' · ');
     // 승패 금액만 표시(플러스 = 승자 1명), 첫뻑은 아래 줄에 따로
     setHTML($('preview'), P.map(function (n, i) {
       var a = r ? r.winAmounts[i] : 0;
       var crown = r && !r.nagari && i === form.winner ? '🏆 ' : '';
       return '<div><div class="hint">' + crown + esc(n) + '</div><div class="amt ' + cls(a) + '">' + (r ? won(a) : '–') + '</div></div>';
-    }).join('') + (r && pp.length ? '<div class="hint" style="grid-column:1/-1">+ 첫뻑 ' + pp.map(function (i) { return esc(P[i]); }).join(', ') + ' (저장 시 이 판 기록에 함께 남음)</div>' : ''));
+    }).join('') + (sumLine ? '<div class="hint sum">' + esc(sumLine) + '</div>' : ''));
     var no = form.editId ? editNo() : 0;
     $('btnSave').disabled = !ready;
     setText($('btnSave'), form.editId ? '#' + no + '판 수정 저장' : '저장');
@@ -678,12 +746,13 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     $('tab-today').setAttribute('aria-label', '오늘 기록' + (games.length ? ', ' + games.length + '판' : ''));
     $('noGames').hidden = games.length > 0;
     $('btnClose').hidden = games.length === 0;
-    $('btnClose2').hidden = games.length === 0 || !!form.editId;
+    $('closeWrap2').hidden = games.length === 0 || !!form.editId;
     // 입력 중인 판을 매번 저장 → 앱이 꺼져도 다시 켜면 그대로
     state.draft = JSON.parse(JSON.stringify(form));
     save();
     setHTML($('games'), games.map(function (g, idx) { return { g: g, no: idx + 1 }; }).reverse().map(function (x) {
-      var g = x.g, gr = results[x.no - 1], GP = g.players || P;   // 한 판 줄 안에서는 그 판 이름으로 통일
+      // 이름은 지금 이름(state.players)으로 — 이름 변경은 '그 자리 사람의 이름을 바꾸는 것'이라 오늘 기록 전체를 같은 이름으로
+      var g = x.g, gr = results[x.no - 1], GP = P;
       var line = function (label, arr) {
         return '<span class="k">' + label + '</span>' + GP.map(function (n, i) {
           return '<span class="v"><small>' + esc(n) + '</small><b class="' + cls(arr[i]) + '">' + won(arr[i]) + '</b></span>';
@@ -695,8 +764,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
         (gr.nagari && !hasPpeok ? '<div class="s">금액 없음 · 다음 판 판돈 ×' + nextMult + '</div>' :
           (gr.nagari ? '<div class="s">나가리 · 다음 판 판돈 ×' + nextMult + '</div>' : '') +
           '<div class="amts">' + (gr.nagari ? '' : line('승패', gr.winAmounts)) + (hasPpeok ? line('첫뻑', gr.ppeokAmounts) : '') + '</div>') + '</div>' +
-        '<div class="acts"><button class="ghost" data-edit="' + g.id + '" aria-label="' + x.no + '번째 판 수정">✏️ 수정</button>' +
-        '<button class="ghost danger" data-del="' + g.id + '" aria-label="' + x.no + '번째 판 삭제">🗑 삭제</button></div></li>';
+        '<div class="acts"><button class="ghost" data-edit="' + esc(g.id) + '" aria-label="' + x.no + '번째 판 수정">✏️ 수정</button>' +
+        '<button class="ghost danger" data-del="' + esc(g.id) + '" aria-label="' + x.no + '번째 판 삭제">🗑 삭제</button></div></li>';
     }).join(''));
 
     // 날짜별 최종
@@ -710,16 +779,19 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
         '<button class="ghost danger push-end" data-hdel="' + idx + '" aria-label="' + day + ' 기록 삭제">🗑 삭제</button></div></li>';
     }).join(''));
 
-    // 손상 때 보관한 백업
-    var bn = backupKeys().length;
+    // 손상 때 보관한 원본 · 복원 직전 기록 (따로 셈)
+    var bn = backupKeys().length, rn = backupKeys(RESTORE_PREFIX).length;
     $('backupRow').hidden = !bn;
-    setText($('backupInfo'), '손상 때 보관한 백업 ' + bn + '개');
+    setText($('backupInfo'), '저장값이 손상됐을 때 보관한 원본 ' + bn + '개 (최근 5개까지)');
+    $('restoreRow').hidden = !rn;
+    setText($('restoreInfo'), '[붙여넣은 기록으로 바꾸기] 직전에 보관한 기록 ' + rn + '개 (최근 5개까지)');
 
     updateTopbar();
   }
 
+  // 오늘 기록의 판 설명. 이름은 판에 저장된 이름이 아니라 지금 이름으로 (누적·미리보기와 같은 이름)
   function describe(g) {
-    var P = g.players || state.players;
+    var P = state.players;
     var parts = [];
     if (GoStop.isNagari(Object.assign({ players: P }, g))) parts.push('나가리');
     else {
@@ -824,7 +896,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     if (!state.session) state.session = { date: today(), games: [] }; // 첫 활동 날짜 = 게임 날짜
     pp.push(i); resetForm(); render();
     toast('🎉 ' + P[i] + ' 첫뻑 +2,000 반영' + (hadInput ? ' · 입력하던 값은 처음으로 돌렸어요' : ''));
-    scrollToEl($('hEntry'));
+    scrollToEl(null);   // 맨 위로 — 방금 반영된 누적 금액이 보이게
   }
 
   function delGame(id) {
@@ -906,6 +978,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     updateTopbar();
     try { history.replaceState(null, '', '#' + name); } catch (e) {}
     window.scrollTo(0, 0);
+    if ($('toast').classList.contains('show')) placeToast();   // 탭이 바뀌면 알림 자리도 다시
   }
   // 게임 탭에서 판 수정 중이면 상단바를 노란 띠 "✏️ #N판 수정 중" 으로
   function updateTopbar() {
@@ -924,9 +997,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     var active = n > 0 || (state.pendingPpeok || []).length > 0;
     if (!changed.length || !active) return applyNames(names);
     var totals = currentTotals();
-    var msg = '진행 중인 게임이 있어요 (' + n + '판).\n' +
-      changed.map(function (i) { return (i + 1) + '번: ' + state.players[i] + ' → ' + names[i] + ' (누적 ' + won(totals[i]) + ')'; }).join('\n') +
-      '\n바꾸면 지금까지의 누적 금액·승패가 새 이름에 그대로 이어집니다.\n다른 사람이 새로 들어온 거라면 [🏁 오늘 게임 종료] 후 바꾸세요.';
+    // 3줄: 무엇이 이어지는지 · 바뀌는 이름 · 사람이 바뀐 경우 안내
+    var msg = (n ? n + '판 진행 중' : '첫뻑 반영 중') + '이에요. 누적 금액·승패가 새 이름으로 그대로 이어져요.\n' +
+      changed.map(function (i) { return state.players[i] + ' → ' + names[i] + ' (누적 ' + won(totals[i]) + ')'; }).join(' · ') +
+      '\n다른 사람이 새로 들어온 거라면 [🏁 오늘 게임 종료] 후 바꾸세요.';
     confirmBox(msg, { ok: '이름 바꾸기', cancel: '그대로 두기' }).then(function (ok) {
       if (ok) applyNames(names);
       else state.players.forEach(function (x, i) { $('n' + i).value = x; });
@@ -944,33 +1018,50 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     var raw = ''; try { raw = localStorage.getItem(ks[ks.length - 1]) || ''; } catch (e) {}
     copyText(raw, '가장 최근 백업을 복사했어요');
   };
+  $('btnCopyRestore').onclick = function () {
+    var ks = backupKeys(RESTORE_PREFIX); if (!ks.length) return;
+    var raw = ''; try { raw = localStorage.getItem(ks[ks.length - 1]) || ''; } catch (e) {}
+    copyText(raw, '복원 전 기록을 복사했어요');
+  };
   $('btnRestore').onclick = function () {
     var text = $('restoreText').value.trim();
     var chk = null;
     if (text) { try { var o = JSON.parse(text); if (isObj(o)) chk = load(text); } catch (e) {} }
     if (!chk || !chk.valid) return toast('복원할 수 없는 글이에요');
-    confirmBox('현재 기록을 붙여넣은 기록으로 바꿀까요?\n지금 기록은 백업으로 보관됩니다.', { ok: '복원', cancel: '그대로 두기' }).then(function (ok) {
+    confirmBox('현재 기록을 붙여넣은 기록으로 바꿀까요?\n지금 기록은 [복원 전 기록]으로 따로 보관됩니다.', { ok: '복원', cancel: '그대로 두기' }).then(function (ok) {
       if (!ok) return;
       var cur = currentRaw();
-      if (cur) writeBackup(cur);
-      try { localStorage.setItem(KEY, text); } catch (e) { return toast('⚠ 저장 실패 — 브라우저 저장공간을 확인하세요'); }
-      state = load(); takeFlags(state);
+      if (cur) writeBackup(cur, RESTORE_PREFIX);   // 지금 기록은 '복원 전 기록'으로 따로 보관
+      // 붙여넣은 글을 그대로 쓰지 않고, 검사해서 살린 결과(chk)를 저장한다 → 손상 백업이 다시 생기지 않음
+      var partial = takeFlags(chk);
+      var raw = JSON.stringify(chk);
+      try { localStorage.setItem(KEY, raw); } catch (e) { return toast('⚠ 저장 실패 — 브라우저 저장공간을 확인하세요'); }
+      lastRaw = lastMine = raw;
+      state = chk;
       restoreDraft(); render();
       $('restoreText').value = '';
       showTab('play');
-      toast('기록을 복원했어요');
+      toast(partial ? '기록을 복원했어요 — 일부 항목은 망가져 있어 버리고 복원했어요' : '기록을 복원했어요');
     });
   };
 
   // ---------- 다른 창(크롬 탭 ↔ 설치 앱) 동기화 ----------
   // 같은 저장소를 두 곳에서 열어도, 다른 쪽이 저장한 기록을 불러와 덮어쓰지 않게 한다
+  // 이 창에서 입력 중이던 판(form)은 그대로 두고, 판 기록·지난 기록·첫뻑 대기·이름만 다른 창 것으로 바꾼다
   function reloadFromStorage() {
     if (fatal) return;
     if (openDialog.cancel) openDialog.cancel();   // 열린 확인 창은 '그대로 두기'로 닫음 (옛 기록 기준 창이라)
+    var before = JSON.stringify([state.session && state.session.games, state.history]);
+    var myForm = form, myDraftNew = state.draftNew;
     state = load(); takeFlags(state);
-    restoreDraft();
+    form = myForm; state.draftNew = myDraftNew;
+    if (form.editId && !editTargetExists(form.editId)) restoreNewForm();   // 고치던 판이 다른 창에서 지워짐
+    // 이 창 입력 상태를 저장소에 다시 쓰지 않는다 (두 창이 서로의 입력을 번갈아 덮어쓰는 것 방지)
+    state.draft = JSON.parse(JSON.stringify(form));
+    lastMine = JSON.stringify(state);
     render();
-    toast('다른 창에서 바뀐 기록을 불러왔어요');
+    var after = JSON.stringify([state.session && state.session.games, state.history]);
+    if (after !== before) toast('다른 창에서 바뀐 기록을 불러왔어요');
   }
   window.addEventListener('storage', function (e) { if (e.key === KEY || e.key === null) { if (currentRaw() !== (lastRaw || '')) reloadFromStorage(); } });
   document.addEventListener('visibilitychange', function () {
@@ -980,10 +1071,11 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // 화면을 그리다 오류가 나도 인트로에서 멈추지 않게: 기록은 그대로 두고 안내를 띄운다
   function showFatal(err) {
     var raw = currentRaw();
-    $('banner').innerHTML = '<div class="banner" role="alert"><b>⚠ 화면을 그리는 중 문제가 생겼어요.</b><br>' +
+    // setHTML 로 써야 다음 render 가 정상일 때 이 안내를 지운다 (기억해 둔 값과 비교하므로)
+    setHTML($('banner'), '<div class="banner" role="alert"><b>⚠ 화면을 그리는 중 문제가 생겼어요.</b><br>' +
       '기록은 지우지 않았어요. [새로고침]을 눌러 보고, 계속되면 [기록 복사]로 기록을 보관한 뒤 알려 주세요.<br>' +
       '<small>' + esc(String(err && err.message || err)) + '</small>' +
-      '<div class="row"><button id="fatalReload">새로고침</button><button id="fatalCopy">기록 복사</button></div></div>';
+      '<div class="row"><button id="fatalReload">새로고침</button><button id="fatalCopy">기록 복사</button></div></div>');
     $('fatalReload').onclick = function () { location.reload(); };
     $('fatalCopy').onclick = function () { copyText(raw, '기록을 복사했습니다'); };
     try { showTab('play'); } catch (e) {}
