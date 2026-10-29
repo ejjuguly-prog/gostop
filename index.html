@@ -140,6 +140,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 /* 박·독박 요약 줄이 들어가도 바 높이가 늘지 않게 줄 간격·여백을 줄임 */
 .savebar { padding-top: 6px; padding-bottom: 6px; }
 .savebar .preview { margin: 0 0 6px; padding: 4px 6px; gap: 2px 8px; line-height: 1.25; }
+/* 8자 한글 이름도 미리보기 칸에서 가로로 넘치지 않게 (keep-all 과 함께) */
+.preview > div, .preview .sum { min-width: 0; overflow-wrap: anywhere; }
 .savebar .preview .sum { grid-column: 1 / -1; font-size: 14px; }
 .savebar .primary { min-height: 48px; }
 /* 게임 탭 맨 아래 [오늘 게임 종료]: 저장 버튼과 멀리 떼어 놓음 */
@@ -516,6 +518,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   }
   // 알림이 떠 있는 동안 스크롤하면 저장 바 위치가 바뀔 수 있어 다시 맞춘다
   window.addEventListener('scroll', function () { if ($('toast').classList.contains('show')) placeToast(); }, { passive: true });
+  window.addEventListener('resize', function () { if ($('toast').classList.contains('show')) placeToast(); });
   // 값이 같으면 건드리지 않음 (화면 읽기 프로그램이 같은 내용을 여러 번 읽지 않게)
   function setText(el, v) { v = String(v); if (el.textContent !== v) el.textContent = v; }
   function setHTML(el, h) { if (setHTML.last.get(el) !== h) { el.innerHTML = h; setHTML.last.set(el, h); } }
