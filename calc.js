@@ -10,6 +10,8 @@
   function toInt(v) { var x = typeof v === 'string' && v.trim() !== '' ? Number(v) : v; return Number.isInteger(x) ? x : NaN; }
   function toIdx(v, n) { var x = toInt(v); return x >= 0 && x < n ? x : null; }          // 사람 index (아니면 null)
   function toCount(v) { var x = Number(v); return Number.isFinite(x) && x > 0 ? Math.floor(x) : 0; } // 고·흔들기 횟수
+  // 나가리 판정 하나로 통일 (calcGame·isNagari·winLoss 가 같은 기준을 쓰도록): 승자가 없거나 3점 미만
+  function nagariOf(winner, score, n) { return toIdx(winner, n) == null || baseAmount(score) === 0; }
 
   // 3·4점 1천, 5·6점 2천, 7·8점 3천 … (짝수는 바로 아래 홀수로 인정)
   function baseAmount(score) {
@@ -58,7 +60,7 @@
     var base = 0;
     var mult = game.mult || 1;
     var w = toIdx(game.winner, n);
-    var nagari = w == null || baseAmount(game.score) === 0;
+    var nagari = nagariOf(game.winner, game.score, n);
     var final = finalScore(game.score, game.go, game.shake);
 
     if (!nagari) {
@@ -117,7 +119,7 @@
 
   function isNagari(game) {
     var n = game.players && game.players.length ? game.players.length : 3;
-    return toIdx(game.winner, n) == null || baseAmount(game.score) === 0;
+    return nagariOf(game.winner, game.score, n);
   }
 
   // 판 순서대로 계산: 직전까지 연속된 나가리 수만큼 2배씩 (승자가 나오면 1배로 초기화)
@@ -135,8 +137,8 @@
     var wl = [];
     for (var i = 0; i < n; i++) wl.push({ w: 0, l: 0 });
     games.forEach(function (g) {
+      if (nagariOf(g.winner, g.score, n)) return;
       var w = toIdx(g.winner, n);
-      if (w == null || baseAmount(g.score) === 0) return;
       for (var j = 0; j < n; j++) { if (j === w) wl[j].w++; else wl[j].l++; }
     });
     return wl;

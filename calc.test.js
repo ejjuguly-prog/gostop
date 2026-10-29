@@ -110,6 +110,22 @@ for (let w = 0; w < 3; w++) for (let s = 3; s <= 12; s++) for (let pp = -1; pp <
 }
 cases.push([`승자 1명 전수 검사 (${combos}조합)`, bad, 0]);
 
+// 나가리 판정 통일 (calcGame·isNagari·winLoss·calcSession 이 같은 기준)
+const { isNagari } = require('./calc.js');
+cases.push(['isNagari 승자 "1"(글자)·5점 → false', isNagari({ players: P, winner: '1', score: 5 }), false]);
+cases.push(['연속 나가리 3판 배수 [1,2,4]', calcSession([G({}), G({ winner: 0, score: 2 }), G({ winner: 9, score: 5 })]).map((r) => r.mult), [1, 2, 4]]);
+let multBad = 0;
+sr.forEach((r, i) => { if (r.nagari && i + 1 < sr.length && sr[i + 1].mult !== r.mult * 2) multBad++; });
+cases.push(['나가리 판 다음 배수 = 그 판 mult×2 (seq 전 구간)', multBad, 0]);
+let judgeBad = 0, judgeN = 0;
+for (const w of [null, -1, 0, 1, 2, 3, '0', '2', 'x', 1.5]) for (let s = 0; s <= 6; s++) {
+  const game = { players: P, winner: w, score: s };
+  const counted = winLoss([game], 3).some((x) => x.w > 0);
+  judgeN++;
+  if (counted === isNagari(game) || calcGame(game).nagari !== isNagari(game)) judgeBad++;
+}
+cases.push([`winLoss·isNagari·calcGame 판정 일치 (${judgeN}조합)`, judgeBad, 0]);
+
 let pass = 0;
 for (const [name, actual, expected] of cases) {
   try { assert.deepStrictEqual(actual, expected); pass++; console.log('PASS', name); }
