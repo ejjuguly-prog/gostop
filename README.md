@@ -35,7 +35,7 @@
 | `index.html` | 화면 전체 (HTML·CSS·JS 한 파일) |
 | `calc.js` | 계산 규칙 — 화면과 분리된 순수 함수 (브라우저·Node 공용) |
 | `calc.test.js` | 계산 테스트 (엑셀 실제 기록 + 규칙별 사례 + 전수 검사) |
-| `sw.js` · `manifest.webmanifest` · `Main_Icon.jpg` | 홈 화면 설치·오프라인 실행 |
+| `sw.js` · `manifest.webmanifest` · `icons/` | 홈 화면 설치·오프라인 실행·앱 아이콘 (`icons/` 는 `Main_Icon.jpg` 원본에서 생성) |
 
 ## 개발
 
