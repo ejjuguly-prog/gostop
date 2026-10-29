@@ -1,0 +1,13 @@
+{
+  "name": "고스톱 점수계산",
+  "short_name": "고스톱",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#b3261e",
+  "icons": [
+    { "src": "Main_Icon.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" }
+  ]
+}

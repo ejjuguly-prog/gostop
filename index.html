@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>고스톱 점수계산</title>
+<meta name="theme-color" content="#b3261e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="Main_Icon.jpg" type="image/jpeg">
+<link rel="apple-touch-icon" href="Main_Icon.jpg">
+<style>
+:root {
+  --bg: #f6f3ee; --card: #ffffff; --text: #1d1b19; --muted: #6b645c; --line: #e3ddd4;
+  --accent: #b3261e; --accent-text: #ffffff; --chip: #efe9e1; --chip-on: #1d1b19; --chip-on-text: #ffffff;
+  --plus: #0b7a3e; --minus: #b3261e; --warn-bg: #fff4d6; --warn-text: #6b4e00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141312; --card: #1f1d1b; --text: #f2eee9; --muted: #a39b91; --line: #34302c;
+    --accent: #ef6a5f; --accent-text: #1a0a08; --chip: #2c2926; --chip-on: #f2eee9; --chip-on-text: #141312;
+    --plus: #5fd08f; --minus: #ff8a80; --warn-bg: #3a3016; --warn-text: #ffd97a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 16px/1.45 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; max-width: 560px; margin: 0 auto; }
+/* 상단: 현재 탭 이름 + 날짜 (스크롤해도 고정) */
+.topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar .logo { border-radius: 8px; }
+.topbar .hint { margin-left: auto; font-size: 13px; }
+h1 { font-size: 19px; margin: 0; }
+/* 본문: 하단 탭바 높이만큼 아래 여백 */
+main { padding: 12px 16px calc(84px + env(safe-area-inset-bottom)); }
+.summary { padding: 10px 14px; }
+/* 하단 탭바 — 알바 앱과 같은 구성: 고정 · 아이콘+글자 · 선택 탭 강조 · 아이폰 홈 막대 여백 */
+.tab-bar { position: fixed; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; z-index: 10; display: flex;
+  height: calc(62px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+  background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -2px 12px rgba(0,0,0,.06); }
+.tab-item { flex: 1 1 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: none; border-radius: 0; color: var(--muted); -webkit-tap-highlight-color: transparent; }
+.tab-item svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tab-item.active { color: var(--accent); font-weight: 700; }
+.tab-item.active svg { stroke-width: 2.2; }
+.tab-label { font-size: 11.5px; line-height: 1; }
+.tab-badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.input { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); margin-bottom: 10px; min-height: 44px; }
+.rules { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 14px; }
+.rules dt { font-weight: 700; }
+.rules dd { margin: 0; color: var(--muted); }
+h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; border-radius: 12px; min-height: 44px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ghost { background: transparent; color: var(--muted); padding: 0 10px; }
+.chip { background: var(--chip); padding: 0 14px; }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-text); font-weight: 700; }
+.chip:disabled { opacity: .35; cursor: not-allowed; }
+.primary { background: var(--accent); color: var(--accent-text); font-weight: 700; width: 100%; min-height: 52px; font-size: 17px; }
+.primary:disabled { opacity: .4; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grid3 .chip { min-height: 52px; font-size: 16px; }
+.field { margin-bottom: 14px; }
+.label { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper button { width: 52px; height: 52px; font-size: 24px; background: var(--chip); }
+.stepper output { font-size: 28px; font-weight: 800; min-width: 48px; text-align: center; }
+/* 점수 입력: 기본 점수 · 고 · 흔들기 3줄 + 계산식 */
+.steprow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.steprow:first-of-type { border-top: 0; }
+.steprow small { font-size: 12px; }
+.stepper.sm { gap: 6px; }
+.stepper.sm button { width: 46px; height: 46px; font-size: 22px; }
+.stepper.sm output { font-size: 22px; min-width: 34px; }
+.scorecalc { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--chip); }
+.scorecalc .big { font-size: 20px; font-weight: 800; }
+.scorecalc .f { font-size: 13px; color: var(--muted); }
+.hint { color: var(--muted); font-size: 14px; }
+.loser { padding: 10px 0; border-top: 1px solid var(--line); }
+.loser:first-of-type { border-top: 0; }
+.loser .name { font-weight: 700; margin-bottom: 6px; }
+.totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.totals .who { font-size: 14px; color: var(--muted); }
+.totals .amt { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.plus { color: var(--plus); } .minus { color: var(--minus); }
+.preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; background: var(--chip); border-radius: 12px; padding: 10px; margin: 4px 0 12px; }
+.preview .amt { font-weight: 800; font-variant-numeric: tabular-nums; }
+.games { list-style: none; margin: 0; padding: 0; }
+.games li { display: flex; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.games li:first-child { border-top: 0; }
+.games .desc { flex: 1; min-width: 0; }
+/* 판 기록: 금액은 사람별 3칸, 수정·삭제는 아래 줄 오른쪽 */
+.games li.game { flex-wrap: wrap; }
+.games li.game .desc { flex-basis: 100%; }
+.games .acts { margin-left: auto; display: flex; gap: 4px; }
+.games .acts button { min-height: 36px; font-size: 14px; }
+.amts { display: grid; grid-template-columns: 3.2em repeat(3, 1fr); gap: 2px 6px; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.amts .k { color: var(--muted); }
+.amts.nolabel { grid-template-columns: repeat(3, 1fr); font-size: 15px; margin-bottom: 4px; }
+.amts .v { text-align: right; }
+.amts .v small { color: var(--muted); margin-right: 4px; }
+.games .desc .t { font-weight: 700; }
+.games .desc .s { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.games li.editing { background: var(--warn-bg); border-radius: 10px; padding-inline: 8px; }
+.banner { background: var(--warn-bg); color: var(--warn-text); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.banner button { background: var(--warn-text); color: var(--warn-bg); padding: 0 14px; margin-top: 8px; font-weight: 700; }
+.close-day { background: var(--chip); width: 100%; font-weight: 700; margin-top: 8px; }
+.hist li { display: block; }
+dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); padding: 18px; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.dlg-actions button { padding: 0 16px; }
+.toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20; transform: translateX(-50%); background: var(--chip-on); color: var(--chip-on-text); padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <img src="Main_Icon.jpg" alt="" class="logo" width="30" height="30">
+  <h1 id="viewTitle">게임</h1>
+  <span class="hint" id="todayLabel"></span>
+</header>
+
+<main>
+<div id="banner"></div>
+
+<!-- 탭 1: 게임 (누적 요약 + 판 입력) -->
+<section class="view" id="view-play" aria-labelledby="tab-play">
+  <div class="card summary"><div class="totals" id="totals"></div></div>
+  <section class="card" aria-labelledby="hEntry">
+    <h2 id="hEntry"><span id="entryTitle">새 판 입력</span></h2>
+    <div class="banner" id="multBadge" role="status" hidden></div>
+  
+    <div class="field">
+      <span class="label" id="lblPpeok">① 첫뻑 — 누르는 즉시 +2,000 반영 (나머지 두 명 각 −1,000 · 없으면 건너뛰기)</span>
+      <div class="grid3" id="ppeokBtns" role="group" aria-labelledby="lblPpeok"></div>
+    </div>
+    <div class="field">
+      <span class="label" id="lblWinner">② 승자</span>
+      <div class="grid3" id="winnerBtns" role="group" aria-labelledby="lblWinner"></div>
+      <div class="row" style="margin-top:8px"><button class="chip" id="btnNagari" aria-pressed="false">나가리 (승자 없음)</button></div>
+    </div>
+  
+    <div class="field" id="scoreField">
+      <span class="label" id="lblScore">③ 점수 — 고·흔들기는 따로 넣으면 자동 계산</span>
+      <div class="steprow">
+        <span><b>기본 점수</b><br><small class="hint" id="scoreSub">고·흔들기 빼고 딴 점수</small></span>
+        <div class="stepper sm" role="group" aria-label="기본 점수">
+          <button data-step="score" data-delta="-1" aria-label="기본 점수 1 내리기">−</button>
+          <output id="scoreOut" aria-live="polite">3</output>
+          <button data-step="score" data-delta="1" aria-label="기본 점수 1 올리기">+</button>
+        </div>
+      </div>
+      <div class="steprow">
+        <span><b>고</b><br><small class="hint" id="goSub">1고 +1 · 2고 +2 · 3고부터 ×2</small></span>
+        <div class="stepper sm" role="group" aria-label="고">
+          <button data-step="go" data-delta="-1" aria-label="고 1번 빼기">−</button>
+          <output id="goOut" aria-live="polite">0</output>
+          <button data-step="go" data-delta="1" aria-label="고 1번 더하기">+</button>
+        </div>
+      </div>
+      <div class="steprow">
+        <span><b>흔들기·폭탄</b><br><small class="hint" id="shakeSub">1번마다 ×2</small></span>
+        <div class="stepper sm" role="group" aria-label="흔들기·폭탄">
+          <button data-step="shake" data-delta="-1" aria-label="흔들기 1번 빼기">−</button>
+          <output id="shakeOut" aria-live="polite">0</output>
+          <button data-step="shake" data-delta="1" aria-label="흔들기 1번 더하기">+</button>
+        </div>
+      </div>
+      <div class="scorecalc" id="scoreCalc" aria-live="polite"></div>
+    </div>
+  
+    <div class="field" id="loserField">
+      <span class="label">④ 패자별 박 · 독박</span>
+      <div id="losers"></div>
+    </div>
+  
+  
+    <div class="preview" id="preview" aria-live="polite"></div>
+    <button class="primary" id="btnSave">저장</button>
+    <div class="row" style="margin-top:8px"><button class="ghost" id="btnCancelEdit" hidden>수정 취소</button></div>
+  </section>
+</section>
+
+<!-- 탭 2: 오늘 기록 (판별 기록 · 수정 · 마감) -->
+<section class="view" id="view-today" aria-labelledby="tab-today" hidden>
+  <div class="card summary"><div class="totals" id="totals2"></div></div>
+  <section class="card" aria-labelledby="hGames">
+    <h2 id="hGames">판별 기록 <span id="gameCount"></span></h2>
+    <ul class="games" id="games"></ul>
+    <p class="hint" id="noGames">아직 기록이 없습니다. <b>게임</b> 탭에서 판을 입력하세요.</p>
+    <button class="close-day" id="btnClose">오늘 마감 (최종 금액만 남기기)</button>
+  </section>
+</section>
+
+<!-- 탭 3: 지난 기록 (날짜별 최종 금액) -->
+<section class="view" id="view-history" aria-labelledby="tab-history" hidden>
+  <section class="card" aria-labelledby="hHist">
+    <h2 id="hHist">날짜별 최종 기록</h2>
+    <ul class="games hist" id="hist"></ul>
+    <p class="hint" id="noHist">마감한 날짜가 없습니다. <b>오늘 기록</b> 탭에서 [오늘 마감]을 누르면 여기에 남습니다.</p>
+  </section>
+</section>
+
+<!-- 탭 4: 설정 (이름 · 규칙 안내) -->
+<section class="view" id="view-settings" aria-labelledby="tab-settings" hidden>
+  <section class="card" aria-labelledby="hNames">
+    <h2 id="hNames">사람 이름</h2>
+    <label class="label" for="n0">1번</label><input id="n0" class="input" maxlength="8">
+    <label class="label" for="n1">2번</label><input id="n1" class="input" maxlength="8">
+    <label class="label" for="n2">3번</label><input id="n2" class="input" maxlength="8">
+    <button class="primary" id="btnSaveNames">이름 저장</button>
+  </section>
+  <section class="card" aria-labelledby="hRules">
+    <h2 id="hRules">우리 집 계산 규칙</h2>
+    <dl class="rules">
+      <dt>판돈</dt><dd>3·4점 1,000원 · 5·6점 2,000원 · 7·8점 3,000원 … (홀수 점수마다 +1,000)</dd>
+      <dt>고</dt><dd>1고 +1점 · 2고 +2점 · 3고부터 점수 ×2 (4고 ×4, 5고 ×8 …)</dd>
+      <dt>흔들기</dt><dd>흔들기·폭탄 1번마다 점수 ×2</dd>
+      <dt>박</dt><dd>피박·광박·멍박 1개마다 그 패자가 ×2 (피박+광박 = ×4)</dd>
+      <dt>독박</dt><dd>독박한 사람이 패자 몫 전부(박 포함)를 혼자 냄</dd>
+      <dt>첫뻑</dt><dd>누르는 즉시 +2,000 (나머지 두 명 각 −1,000) · 한 판에 1인 1회</dd>
+      <dt>나가리</dt><dd>다음 판 판돈 ×2 · 연속이면 ×4, ×8 …</dd>
+      <dt>마감</dt><dd>판별 기록을 정리하고 날짜별 최종 금액만 남김</dd>
+    </dl>
+  </section>
+</section>
+</main>
+
+<nav class="tab-bar" aria-label="주요 메뉴">
+  <button class="tab-item" data-tab="play" id="tab-play" aria-controls="view-play"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="10" height="15" rx="2" transform="rotate(-10 8.5 12.5)"/><rect x="10" y="4" width="10" height="15" rx="2" transform="rotate(8 15 11.5)"/><circle cx="15" cy="11.5" r="2.2"/></svg><span class="tab-label">게임</span></button>
+  <button class="tab-item" data-tab="today" id="tab-today" aria-controls="view-today"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5h6v3H9zM8.5 11h7M8.5 14.5h7M8.5 18h4"/></svg><span class="tab-badge" id="badgeToday" aria-hidden="true" hidden></span><span class="tab-label">오늘 기록</span></button>
+  <button class="tab-item" data-tab="history" id="tab-history" aria-controls="view-history"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg><span class="tab-label">지난 기록</span></button>
+  <button class="tab-item" data-tab="settings" id="tab-settings" aria-controls="view-settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg><span class="tab-label">설정</span></button>
+</nav>
+
+<dialog id="dlgConfirm">
+  <form method="dialog">
+    <p id="confirmMsg" style="white-space:pre-line;margin-top:0"></p>
+    <div class="dlg-actions">
+      <button class="ghost" value="cancel">취소</button>
+      <button class="chip" value="ok" aria-pressed="true" id="confirmOk">확인</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="calc.js"></script>
+<script>
+(function () {
+  'use strict';
+  var KEY = 'gostop.v1';
+  var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- 저장소 ----------
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.players) return s; } catch (e) {}
+    return { players: ['장모님', '이준규', '전진표'], session: null, history: [], pendingPpeok: [] };
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { toast('⚠ 저장 실패 — 브라우저 저장공간을 확인하세요'); }
+  }
+  var state = load();
+
+  // ---------- 유틸 ----------
+  function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function dayLabel(iso) { var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); return iso + ' (' + DAYS[d.getDay()] + ')'; }
+  function won(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ko-KR'); }
+  function cls(n) { return n > 0 ? 'plus' : n < 0 ? 'minus' : ''; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('show'); }, 1800); }
+  // 대화상자: 'close' 이벤트는 화면이 가려진 상태 등에서 늦거나 안 올 수 있어, 버튼 클릭에서 바로 처리한다
+  function openDialog(d, onResult) {
+    var ok = d.querySelector('button[value="ok"]'), cancel = d.querySelector('button[value="cancel"]');
+    function done(v) { ok.onclick = cancel.onclick = d.oncancel = null; if (d.open) d.close(); onResult(v); }
+    ok.onclick = function (e) { e.preventDefault(); done(true); };
+    cancel.onclick = function (e) { e.preventDefault(); done(false); };
+    d.oncancel = function (e) { e.preventDefault(); done(false); }; // Esc
+    d.showModal();
+  }
+  function confirmBox(msg) {
+    return new Promise(function (res) { $('confirmMsg').textContent = msg; openDialog($('dlgConfirm'), res); });
+  }
+
+  // ---------- 입력 폼 상태 ----------
+  var form;
+  function resetForm() { form = { winner: null, nagari: false, score: 3, go: 0, shake: 0, bak: {}, dokbak: null, ppeok: [], editId: null }; }
+  // 첫뻑: 새 판은 누르는 즉시 반영(state.pendingPpeok, 새로고침해도 유지) → 저장 때 그 판 기록에 포함. 수정 중이면 그 판의 값.
+  function curPpeok() { return form.editId ? form.ppeok : (state.pendingPpeok || (state.pendingPpeok = [])); }
+  resetForm();
+
+  function gameFromForm() {
+    return { players: state.players, winner: form.nagari ? null : form.winner, score: form.score, go: form.go, shake: form.shake,
+      bak: form.bak, dokbak: form.dokbak, ppeok: curPpeok().slice() };
+  }
+
+  // 금액은 저장하지 않고 판 순서로 매번 계산 (중간 판을 고쳐도 나가리 배수가 뒤 판까지 맞게 반영)
+  function sessionResults() { return state.session ? GoStop.calcSession(state.session.games) : []; }
+  function sumTotals(results) {
+    var t = [0, 0, 0];
+    results.forEach(function (r) { r.amounts.forEach(function (a, i) { t[i] += a; }); });
+    return t;
+  }
+  function formMult() {
+    var games = state.session ? state.session.games : [];
+    if (form.editId) {
+      var i = games.findIndex(function (x) { return x.id === form.editId; });
+      return i >= 0 ? GoStop.calcSession(games)[i].mult : 1;
+    }
+    return GoStop.nextMult(games);
+  }
+
+  // ---------- 렌더 ----------
+  function render() {
+    var P = state.players, s = state.session;
+    var isStale = s && s.date !== today();
+
+    // 지난 날짜 미마감 알림
+    $('banner').innerHTML = isStale
+      ? '<div class="banner" role="alert"><b>' + esc(dayLabel(s.date)) + '</b> 기록이 아직 마감되지 않았습니다.<br>' +
+        '<button id="btnCloseStale">그 날짜로 마감하기</button></div>' : '';
+    if (isStale) $('btnCloseStale').onclick = closeDay;
+
+    $('todayLabel').textContent = dayLabel(s ? s.date : today());
+
+    // 누적
+    var results = sessionResults();
+    var totals = sumTotals(results);
+    var pend = state.pendingPpeok || [];
+    if (pend.length) GoStop.calcGame({ players: P, winner: null, score: 0, ppeok: pend }).ppeokAmounts.forEach(function (a, i) { totals[i] += a; });
+    $('totals').innerHTML = $('totals2').innerHTML = P.map(function (n, i) {
+      return '<div><div class="who">' + esc(n) + '</div><div class="amt ' + cls(totals[i]) + '">' + won(totals[i]) + '</div></div>';
+    }).join('');
+
+    // 승자 버튼
+    $('winnerBtns').innerHTML = P.map(function (n, i) {
+      return '<button class="chip" data-w="' + i + '" aria-pressed="' + (!form.nagari && form.winner === i) + '">' + esc(n) + '</button>';
+    }).join('');
+    $('btnNagari').setAttribute('aria-pressed', String(form.nagari));
+
+    // 점수
+    var mult = formMult();
+    var fin = GoStop.finalScore(form.score, form.go, form.shake);
+    var base = GoStop.baseAmount(fin) * mult;
+    $('scoreOut').textContent = form.score;
+    $('goOut').textContent = form.go;
+    $('shakeOut').textContent = form.shake;
+    $('scoreCalc').innerHTML = scoreFormula(form, fin, base, mult);
+    $('multBadge').hidden = mult === 1;
+    $('multBadge').textContent = '🔥 나가리 다음 판 — 판돈 ×' + mult;
+    $('scoreField').hidden = form.nagari;
+    $('loserField').hidden = form.nagari || form.winner == null;
+
+    // 패자별 박·독박
+    var noMoney = !base;
+    $('losers').innerHTML = form.winner == null ? '' : P.map(function (n, i) {
+      if (i === form.winner) return '';
+      var b = form.bak[i] || {};
+      var chip = function (key, label) {
+        return '<button class="chip" data-l="' + i + '" data-k="' + key + '" aria-pressed="' + !!b[key] + '"' + (noMoney ? ' disabled' : '') + '>' + label + '</button>';
+      };
+      return '<div class="loser"><div class="name">' + esc(n) + '</div><div class="row">' +
+        chip('pi', '피박') + chip('gwang', '광박') + chip('meong', '멍박') +
+        '<button class="chip" data-d="' + i + '" aria-pressed="' + (form.dokbak === i) + '"' + (noMoney ? ' disabled' : '') + '>독박</button>' +
+        '</div></div>';
+    }).join('');
+
+    // 첫뻑
+    var pp = curPpeok();
+    $('ppeokBtns').innerHTML = P.map(function (n, i) {
+      var done = pp.indexOf(i) >= 0;
+      return '<button class="chip" data-p="' + i + '" aria-pressed="' + done + '"' + (isStale && !form.editId ? ' disabled' : '') +
+        ' aria-label="' + esc(n) + (done ? ' 첫뻑 반영됨, 누르면 취소' : ' 첫뻑') + '">' + (done ? '✓ ' : '') + esc(n) + '</button>';
+    }).join('') + (pp.length ? '<div class="hint" style="grid-column:1/-1">이 판 첫뻑: ' + pp.map(function (i) { return esc(P[i]) + ' +' + (GoStop.PPEOK_UNIT * 2).toLocaleString('ko-KR'); }).join(', ') +
+      (form.editId ? '' : ' — 누적에 반영됨') + '</div>' : '');
+
+    // 미리보기
+    var ready = form.nagari || form.winner != null;
+    var r = ready ? GoStop.calcGame(Object.assign(gameFromForm(), { mult: mult })) : null;
+    // 승패 금액만 표시(플러스 = 승자 1명), 첫뻑은 아래 줄에 따로
+    $('preview').innerHTML = P.map(function (n, i) {
+      var a = r ? r.winAmounts[i] : 0;
+      var crown = r && !r.nagari && i === form.winner ? '🏆 ' : '';
+      return '<div><div class="hint">' + crown + esc(n) + '</div><div class="amt ' + cls(a) + '">' + (r ? won(a) : '–') + '</div></div>';
+    }).join('') + (r && pp.length ? '<div class="hint" style="grid-column:1/-1">+ 첫뻑 ' + pp.map(function (i) { return esc(P[i]); }).join(', ') + ' (저장 시 이 판 기록에 함께 남음)</div>' : '');
+    // 지난 날짜가 미마감이면 새 판이 그 날짜에 섞이지 않게 막는다 (수정은 허용)
+    var blockNew = isStale && !form.editId;
+    $('btnSave').disabled = !ready || blockNew;
+    $('btnSave').textContent = blockNew ? '지난 날짜를 먼저 마감하세요' : form.editId ? '수정 저장' : '저장';
+    $('btnCancelEdit').hidden = !form.editId;
+    $('entryTitle').textContent = form.editId ? '판 수정 중' : '새 판 입력';
+
+    // 판별 기록 (최신이 위)
+    var games = s ? s.games : [];
+    $('gameCount').textContent = games.length ? '· ' + games.length + '판' : '';
+    $('badgeToday').hidden = !games.length;
+    $('badgeToday').textContent = games.length;
+    $('tab-today').setAttribute('aria-label', '오늘 기록' + (games.length ? ', ' + games.length + '판' : ''));
+    $('noGames').hidden = games.length > 0;
+    $('btnClose').hidden = games.length === 0;
+    $('games').innerHTML = games.map(function (g, idx) { return { g: g, no: idx + 1 }; }).reverse().map(function (x) {
+      var g = x.g, gr = results[x.no - 1];
+      var line = function (label, arr) {
+        return '<span class="k">' + label + '</span>' + P.map(function (n, i) {
+          return '<span class="v"><small>' + esc(n) + '</small><b class="' + cls(arr[i]) + '">' + won(arr[i]) + '</b></span>';
+        }).join('');
+      };
+      var hasPpeok = GoStop.ppeokList(g.ppeok).length > 0;
+      return '<li class="game' + (form.editId === g.id ? ' editing' : '') + '"><div class="desc"><div class="t">#' + x.no + ' ' + esc(describe(g)) + (gr.mult > 1 && !gr.nagari ? ' · <span class="minus">×' + gr.mult + '</span>' : '') + '</div>' +
+        (gr.nagari && !hasPpeok ? '<div class="s">금액 없음 · 다음 판 판돈 ×2</div>' :
+          '<div class="amts">' + (gr.nagari ? '' : line('승패', gr.winAmounts)) + (hasPpeok ? line('첫뻑', gr.ppeokAmounts) : '') + '</div>') + '</div>' +
+        '<div class="acts"><button class="ghost" data-edit="' + g.id + '" aria-label="' + x.no + '번째 판 수정">✏️ 수정</button>' +
+        '<button class="ghost" data-del="' + g.id + '" aria-label="' + x.no + '번째 판 삭제">🗑 삭제</button></div></li>';
+    }).join('');
+
+    // 날짜별 최종
+    $('noHist').hidden = state.history.length > 0;
+    $('hist').innerHTML = state.history.slice().reverse().map(function (h, ri) {
+      var idx = state.history.length - 1 - ri;
+      return '<li><div class="row" style="justify-content:space-between"><b>' + esc(dayLabel(h.date)) + '</b><span class="hint">' + h.games + '판</span></div>' +
+        '<div class="amts nolabel">' + h.players.map(function (n, i) { return '<span class="v"><small>' + esc(n) + '</small><b class="' + cls(h.totals[i]) + '">' + won(h.totals[i]) + '</b></span>'; }).join('') + '</div>' +
+        '<div class="row"><button class="ghost" data-copy="' + idx + '">📋 복사</button><button class="ghost" data-hdel="' + idx + '">삭제</button></div></li>';
+    }).join('');
+  }
+
+  function describe(g) {
+    var P = g.players || state.players;
+    var parts = [];
+    if (g.winner == null || !GoStop.baseAmount(g.score)) parts.push('나가리');
+    else {
+      var extra = (g.go ? ' · ' + g.go + '고' : '') + (g.shake ? ' · 흔들기' + (g.shake > 1 ? '×' + g.shake : '') : '');
+      parts.push('🏆 ' + P[g.winner] + ' ' + g.score + '점' + (extra ? extra + ' → ' + GoStop.finalScore(g.score, g.go, g.shake) + '점' : ''));
+      Object.keys(g.bak || {}).forEach(function (i) {
+        var b = g.bak[i], k = [];
+        if (b.pi) k.push('피박'); if (b.gwang) k.push('광박'); if (b.meong) k.push('멍박');
+        if (k.length) parts.push(P[i] + ' ' + k.join('+'));
+      });
+      if (g.dokbak != null) parts.push(P[g.dokbak] + ' 독박');
+    }
+    GoStop.ppeokList(g.ppeok).forEach(function (i) { parts.push(P[i] + ' 첫뻑'); });
+    return parts.join(' · ');
+  }
+
+  // ---------- 동작 ----------
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t) return;
+    var d = t.dataset;
+    if (d.tab) showTab(d.tab);
+    else if (d.w != null) { var w = +d.w; form.nagari = false; if (form.winner !== w) { form.winner = w; form.bak = {}; form.dokbak = null; } render(); }
+    else if (d.l != null) { var b = form.bak[d.l] = form.bak[d.l] || {}; b[d.k] = !b[d.k]; render(); }
+    else if (d.d != null) { form.dokbak = form.dokbak === +d.d ? null : +d.d; render(); }
+    else if (d.p != null) togglePpeok(+d.p);
+    else if (d.step) step(d.step, +d.delta);
+    else if (d.edit) startEdit(d.edit);
+    else if (d.del) delGame(d.del);
+    else if (d.copy != null) copyDay(+d.copy);
+    else if (d.hdel != null) delHist(+d.hdel);
+  });
+  $('btnNagari').onclick = function () { form.nagari = !form.nagari; if (form.nagari) { form.winner = null; form.bak = {}; form.dokbak = null; } render(); };
+  var STEP_RANGE = { score: [1, 99], go: [0, 9], shake: [0, 5] };
+  function step(key, delta) {
+    var r = STEP_RANGE[key], v = form[key] + delta;
+    if (v >= r[0] && v <= r[1]) form[key] = v;
+    render();
+  }
+
+  // 계산식 표시: 최종 28점 = (4 + 3고) × 2(3고) × 2(흔들기) → 판돈 13,000원
+  function scoreFormula(f, fin, base, mult) {
+    if (f.score < GoStop.MIN_SCORE) return '<div class="big">3점 미만 = 나가리</div><div class="f">고·흔들기는 3점 이상에서만 계산됩니다</div>';
+    var expr = f.go ? f.score + ' + ' + f.go + '고' : f.score + '점';
+    if (f.go >= 3 || f.shake) expr = (f.go ? '(' + expr + ')' : expr);
+    if (f.go >= 3) expr += ' × ' + Math.pow(2, f.go - 2) + '(' + f.go + '고)';
+    if (f.shake) expr += ' × ' + Math.pow(2, f.shake) + '(흔들기' + (f.shake > 1 ? ' ' + f.shake + '번' : '') + ')';
+    return '<div class="big">최종 ' + fin + '점 · 판돈 ' + base.toLocaleString('ko-KR') + '원</div>' +
+      (f.go || f.shake || mult > 1 ? '<div class="f">' + (f.go || f.shake ? esc(expr) + ' = ' + fin + '점' : '') +
+        (mult > 1 ? (f.go || f.shake ? ' · ' : '') + '나가리 다음 판이라 판돈 ×' + mult : '') + '</div>' : '');
+  }
+
+  $('btnSave').onclick = function () {
+    var g = gameFromForm(), backToToday = false;
+    // 박 기록은 패자만 남긴다
+    var bak = {};
+    Object.keys(g.bak).forEach(function (i) { var b = g.bak[i]; if (+i !== g.winner && (b.pi || b.gwang || b.meong)) bak[i] = { pi: !!b.pi, gwang: !!b.gwang, meong: !!b.meong }; });
+    var nagari = GoStop.isNagari(g);
+    var rec = { id: form.editId || String(Date.now()), players: state.players.slice(), winner: g.winner, score: g.score,
+      go: nagari ? 0 : g.go, shake: nagari ? 0 : g.shake,
+      bak: nagari ? {} : bak, dokbak: nagari ? null : g.dokbak, ppeok: GoStop.ppeokList(g.ppeok) };
+    if (!form.editId) state.pendingPpeok = []; // 반영돼 있던 첫뻑이 이 판 기록으로 들어감
+    if (!state.session) state.session = { date: today(), games: [] };
+    if (form.editId) {
+      var i = state.session.games.findIndex(function (x) { return x.id === form.editId; });
+      if (i >= 0) state.session.games[i] = rec;
+      toast('수정했습니다');
+      backToToday = true;
+    } else {
+      state.session.games.push(rec);
+      toast(state.session.games.length + '번째 판 저장');
+    }
+    save(); resetForm(); render();
+    if (backToToday) showTab('today');
+  };
+  $('btnCancelEdit').onclick = function () { var wasEdit = !!form.editId; resetForm(); render(); if (wasEdit) showTab('today'); };
+
+  function startEdit(id) {
+    var g = state.session.games.find(function (x) { return x.id === id; }); if (!g) return;
+    form = { winner: g.winner, nagari: g.winner == null, score: g.score || 3, go: g.go || 0, shake: g.shake || 0, bak: JSON.parse(JSON.stringify(g.bak || {})),
+      dokbak: g.dokbak, ppeok: GoStop.ppeokList(g.ppeok), editId: id };
+    render(); showTab('play'); $('hEntry').scrollIntoView();
+  }
+  // 새 판: 누르는 즉시 +2,000 반영하고 입력 화면은 처음 상태로. 이미 한 사람을 누르면 취소 확인.
+  // 수정 중: 그 판의 첫뻑을 켜고 끄기만 (저장 눌러야 반영)
+  function togglePpeok(i) {
+    var P = state.players, pp = curPpeok(), k = pp.indexOf(i);
+    if (form.editId) { if (k >= 0) pp.splice(k, 1); else pp.push(i); render(); return; }
+    if (k >= 0) {
+      confirmBox(P[i] + ' 첫뻑(+2,000)을 취소할까요?').then(function (ok) {
+        if (!ok) return; pp.splice(k, 1); save(); render(); toast(P[i] + ' 첫뻑 취소');
+      });
+      return;
+    }
+    pp.push(i); save(); resetForm(); render();
+    toast('🎉 ' + P[i] + ' 첫뻑 +2,000 반영');
+    $('hEntry').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function delGame(id) {
+    var games = state.session.games, i = games.findIndex(function (x) { return x.id === id; });
+    confirmBox('#' + (i + 1) + ' ' + describe(games[i]) + '\n이 판을 삭제할까요?').then(function (ok) {
+      if (!ok) return;
+      games.splice(i, 1);
+      if (form.editId === id) resetForm();
+      if (!games.length) state.session = null;
+      save(); render(); toast('삭제했습니다');
+    });
+  }
+
+  function closeDay() {
+    var s = state.session; if (!s || !s.games.length) return;
+    if ((state.pendingPpeok || []).length) { toast('첫뻑이 반영된 진행 중인 판을 먼저 저장하세요'); return; }
+    var totals = sumTotals(sessionResults());
+    var line = state.players.map(function (n, i) { return n + ' ' + won(totals[i]); }).join(' / ');
+    confirmBox(dayLabel(s.date) + ' 판별 기록 ' + s.games.length + '판을 정리하고\n최종 금액만 남깁니다.\n\n' + line + '\n\n판별 기록은 되돌릴 수 없습니다.').then(function (ok) {
+      if (!ok) return;
+      var existing = state.history.find(function (h) { return h.date === s.date && h.players.join() === state.players.join(); });
+      if (existing) { totals.forEach(function (t, i) { existing.totals[i] += t; }); existing.games += s.games.length; }
+      else state.history.push({ date: s.date, players: state.players.slice(), totals: totals, games: s.games.length });
+      state.history.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      state.session = null; resetForm(); save(); render(); toast('마감했습니다');
+    });
+  }
+  $('btnClose').onclick = closeDay;
+
+  function dayText(h) {
+    return '🎴 고스톱 ' + dayLabel(h.date) + ' (' + h.games + '판)\n' +
+      h.players.map(function (n, i) { return n + ' ' + won(h.totals[i]) + '원'; }).join('\n');
+  }
+  function copyDay(idx) {
+    var txt = dayText(state.history[idx]);
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+      .then(function () { toast('복사했습니다 — 카톡에 붙여넣기'); })
+      .catch(function () { window.prompt('아래 글을 길게 눌러 복사하세요', txt); });
+  }
+  function delHist(idx) {
+    confirmBox(dayLabel(state.history[idx].date) + ' 최종 기록을 삭제할까요?').then(function (ok) {
+      if (!ok) return; state.history.splice(idx, 1); save(); render();
+    });
+  }
+
+  // 탭 전환 (주소 #게임 등은 바꾸되 뒤로가기 기록은 쌓지 않음)
+  var TABS = { play: '게임', today: '오늘 기록', history: '지난 기록', settings: '설정' };
+  function showTab(name) {
+    if (!TABS[name]) name = 'play';
+    Object.keys(TABS).forEach(function (k) {
+      var on = k === name;
+      $('view-' + k).hidden = !on;
+      $('tab-' + k).classList.toggle('active', on);
+      if (on) $('tab-' + k).setAttribute('aria-current', 'page'); else $('tab-' + k).removeAttribute('aria-current');
+    });
+    $('viewTitle').textContent = TABS[name];
+    if (name === 'settings') state.players.forEach(function (n, i) { $('n' + i).value = n; });
+    try { history.replaceState(null, '', '#' + name); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+
+  // 이름 설정
+  $('btnSaveNames').onclick = function () {
+    var names = [0, 1, 2].map(function (i) { return $('n' + i).value.trim(); });
+    if (names.some(function (n) { return !n; })) return toast('이름을 모두 입력하세요');
+    state.players = names; save(); render(); toast('이름을 저장했습니다');
+  };
+
+  render();
+  showTab(location.hash.slice(1));
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
