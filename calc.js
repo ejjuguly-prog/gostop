@@ -120,6 +120,17 @@
     });
   }
 
+  // 사람별 승·패 횟수: 승 = 그 판 승자, 패 = 승자가 있는 판의 나머지(독박 포함). 나가리는 셈하지 않음
+  function winLoss(games, n) {
+    var wl = [];
+    for (var i = 0; i < n; i++) wl.push({ w: 0, l: 0 });
+    games.forEach(function (g) {
+      if (isNagari(g)) return;
+      for (var j = 0; j < n; j++) { if (j === g.winner) wl[j].w++; else wl[j].l++; }
+    });
+    return wl;
+  }
+
   // 다음에 입력할 판의 배수
   function nextMult(games) {
     var streak = 0;
@@ -127,7 +138,7 @@
     return Math.pow(2, streak);
   }
 
-  var api = { finalScore: finalScore, baseAmount: baseAmount, bakCount: bakCount, calcGame: calcGame, calcSession: calcSession, nextMult: nextMult, isNagari: isNagari, ppeokList: ppeokList, PPEOK_UNIT: PPEOK_UNIT, MIN_SCORE: MIN_SCORE };
+  var api = { winLoss: winLoss, finalScore: finalScore, baseAmount: baseAmount, bakCount: bakCount, calcGame: calcGame, calcSession: calcSession, nextMult: nextMult, isNagari: isNagari, ppeokList: ppeokList, PPEOK_UNIT: PPEOK_UNIT, MIN_SCORE: MIN_SCORE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GoStop = api;
 })(this);

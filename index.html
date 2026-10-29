@@ -113,6 +113,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
 .totals .who { font-size: 14px; color: var(--muted); }
 .totals .amt { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wl { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .plus { color: var(--plus); } .minus { color: var(--minus); }
 .preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; background: var(--chip); border-radius: 12px; padding: 10px; margin: 4px 0 12px; }
 .preview .amt { font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -389,8 +390,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     var totals = sumTotals(results);
     var pend = state.pendingPpeok || [];
     if (pend.length) GoStop.calcGame({ players: P, winner: null, score: 0, ppeok: pend }).ppeokAmounts.forEach(function (a, i) { totals[i] += a; });
+    var wl = GoStop.winLoss(s ? s.games : [], P.length);
     $('totals').innerHTML = $('totals2').innerHTML = P.map(function (n, i) {
-      return '<div><div class="who">' + esc(n) + '</div><div class="amt ' + cls(totals[i]) + '">' + won(totals[i]) + '</div></div>';
+      return '<div><div class="who">' + esc(n) + '</div><div class="amt ' + cls(totals[i]) + '">' + won(totals[i]) + '</div>' +
+        '<span class="wl">' + wl[i].w + '승 ' + wl[i].l + '패</span></div>';
     }).join('');
 
     // 승자 버튼
@@ -481,7 +484,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     $('hist').innerHTML = state.history.slice().reverse().map(function (h, ri) {
       var idx = state.history.length - 1 - ri;
       return '<li><div class="row" style="justify-content:space-between"><b>' + esc(dayLabel(h.date)) + '</b><span class="hint">' + h.games + '판</span></div>' +
-        '<div class="amts nolabel">' + h.players.map(function (n, i) { return '<span class="v"><small>' + esc(n) + '</small><b class="' + cls(h.totals[i]) + '">' + won(h.totals[i]) + '</b></span>'; }).join('') + '</div>' +
+        '<div class="amts nolabel">' + h.players.map(function (n, i) { return '<span class="v"><small>' + esc(n) + '</small><b class="' + cls(h.totals[i]) + '">' + won(h.totals[i]) + '</b>' +
+          (h.wl ? '<span class="wl">' + h.wl[i].w + '승 ' + h.wl[i].l + '패</span>' : '') + '</span>'; }).join('') + '</div>' +
         '<div class="row"><button class="ghost" data-copy="' + idx + '">📋 복사</button><button class="ghost" data-hdel="' + idx + '">삭제</button></div></li>';
     }).join('');
   }
@@ -605,8 +609,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     confirmBox('🏁 오늘 게임을 종료할까요?\n\n' + dayLabel(s.date) + ' · ' + s.games.length + '판\n' + line + '\n\n판별 기록은 정리되고 최종 금액만 [지난 기록]에 남습니다. 되돌릴 수 없습니다.').then(function (ok) {
       if (!ok) return;
       var existing = state.history.find(function (h) { return h.date === s.date && h.players.join() === state.players.join(); });
-      if (existing) { totals.forEach(function (t, i) { existing.totals[i] += t; }); existing.games += s.games.length; }
-      else state.history.push({ date: s.date, players: state.players.slice(), totals: totals, games: s.games.length });
+      var wl = GoStop.winLoss(s.games, state.players.length);
+      if (existing) {
+        totals.forEach(function (t, i) { existing.totals[i] += t; }); existing.games += s.games.length;
+        if (existing.wl) wl.forEach(function (x, i) { existing.wl[i].w += x.w; existing.wl[i].l += x.l; });
+      }
+      else state.history.push({ date: s.date, players: state.players.slice(), totals: totals, wl: wl, games: s.games.length });
       state.history.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
       state.session = null; resetForm(); render(); showTab('history'); toast('게임을 종료했습니다 — 지난 기록에 남았어요');
     });
@@ -615,7 +623,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
   function dayText(h) {
     return '🎴 고스톱 ' + dayLabel(h.date) + ' (' + h.games + '판)\n' +
-      h.players.map(function (n, i) { return n + ' ' + won(h.totals[i]) + '원'; }).join('\n');
+      h.players.map(function (n, i) { return n + ' ' + won(h.totals[i]) + '원' + (h.wl ? ' (' + h.wl[i].w + '승 ' + h.wl[i].l + '패)' : ''); }).join('\n');
   }
   function copyDay(idx) {
     var txt = dayText(state.history[idx]);

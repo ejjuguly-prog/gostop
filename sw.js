@@ -1,5 +1,5 @@
 // 오프라인 실행용: 앱 파일을 캐시하고, 네트워크가 되면 최신으로 갱신
-const CACHE = 'gostop-v10';
+const CACHE = 'gostop-v11';
 const FILES = ['./', 'index.html', 'calc.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

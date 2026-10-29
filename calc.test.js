@@ -76,6 +76,16 @@ cases.push(['금액: 3점 1고 → 4점 → 1,000', g({ winner: 0, score: 3, go:
 cases.push(['금액: 4점 3고+흔들기 → 28점 → 13,000', g({ winner: 2, score: 4, go: 3, shake: 1 }), [-13000, -13000, 26000]]);
 cases.push(['금액: 예전 기록(go 없음)은 score 그대로', g({ winner: 1, score: 6 }), [-2000, 4000, -2000]]);
 
+// 승·패 횟수
+const { winLoss } = require('./calc.js');
+cases.push(['승패: 기록 없음', winLoss([], 3), [{ w: 0, l: 0 }, { w: 0, l: 0 }, { w: 0, l: 0 }]]);
+cases.push(['승패: 승 2·나가리 1·독박 1', winLoss([
+  G({ winner: 0, score: 3 }),
+  G({}),                                   // 나가리 — 셈 안 함
+  G({ winner: 0, score: 2 }),              // 3점 미만 나가리 — 셈 안 함
+  G({ winner: 2, score: 5, dokbak: 1 }),   // 독박도 패
+], 3), [{ w: 1, l: 1 }, { w: 0, l: 2 }, { w: 1, l: 1 }]]);
+
 // 승자는 항상 1명: 승패 금액(winAmounts)에서 플러스는 승자뿐 — 모든 조합 전수 검사
 const full = (o) => calcGame(Object.assign({ players: P, winner: null, score: 0, bak: {}, dokbak: null, ppeok: null }, o));
 let combos = 0, bad = 0;
