@@ -1,7 +1,7 @@
 // 오프라인 실행용: 앱 파일을 캐시하고, 네트워크가 되면 최신으로 갱신
 // 배포할 때마다 CACHE 와 index.html 의 calc.js?v= 값을 같은 숫자로 올린다
-const CACHE = 'gostop-v13';
-const FILES = ['./', 'index.html', 'calc.js?v=13', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
+const CACHE = 'gostop-v14';
+const FILES = ['./', 'index.html', 'calc.js?v=14', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
