@@ -207,6 +207,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
 <!-- 탭 1: 게임 (누적 요약 + 판 입력) -->
 <section class="view" id="view-play" aria-labelledby="tab-play">
+  <div class="banner" id="nameCheck" role="region" aria-label="이름 확인" hidden>
+    <div>👋 처음 오셨네요. 함께 치는 세 사람 이름이 맞나요?<br><b id="nameCheckList"></b></div>
+    <div class="row"><button id="btnNamesOk">맞아요</button><button id="btnNamesEdit">바꾸기</button></div>
+  </div>
   <div class="card summary"><div class="totals" id="totals"></div></div>
   <section class="card" aria-labelledby="hEntry">
     <h2 id="hEntry"><span id="entryTitle">새 판 입력</span></h2>
@@ -474,6 +478,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       pendingPpeok: GoStop.ppeokList(s.pendingPpeok).filter(function (i) { return i >= 0 && i < 3; }),
       draft: isObj(s.draft) ? s.draft : null,
       draftNew: isObj(s.draftNew) ? s.draftNew : null,
+      namesConfirmed: s.namesConfirmed === true || !!session || history.length > 0,
       recovered: lost && !!raw, valid: valid };
   }
   function takeFlags(st) { var r = st.recovered; delete st.recovered; delete st.valid; return r; }
@@ -659,6 +664,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   // ---------- 렌더 ----------
   function render() {
     var P = state.players, s = state.session;
+    // 처음 실행: 이름 확인 1회 (기록이 생기거나 이름을 저장하면 다시 안 뜸)
+    if (!state.namesConfirmed && (s || state.history.length)) state.namesConfirmed = true;
+    $('nameCheck').hidden = !!state.namesConfirmed;
+    if (!state.namesConfirmed) $('nameCheckList').textContent = P.join(' · ');
     // 게임 종료 전까지는 날짜가 바뀌어도 같은 게임으로 계속 이어간다
     var carried = s && s.date !== today();
 
@@ -991,7 +1000,9 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   }
 
   // 이름 설정 — 진행 중인 게임이 있으면 누적이 새 이름으로 이어진다는 것을 먼저 알린다
-  function applyNames(names) { state.players = names; save(); render(); toast('이름을 저장했습니다'); }
+  function applyNames(names) { state.players = names; state.namesConfirmed = true; save(); render(); toast('이름을 저장했습니다'); }
+  $('btnNamesOk').onclick = function () { state.namesConfirmed = true; render(); toast('좋아요! 승자를 눌러 시작하세요'); };
+  $('btnNamesEdit').onclick = function () { state.namesConfirmed = true; render(); showTab('settings'); $('n0').focus(); };
   $('btnSaveNames').onclick = function () {
     var names = [0, 1, 2].map(function (i) { return $('n' + i).value.trim(); });
     if (names.some(function (n) { return !n; })) return toast('이름을 모두 입력하세요');
